@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  pulsar:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pulsar-mcp-server
+    environment:
+      # Network configuration
+      - STELLAR_NETWORK=${STELLAR_NETWORK:-testnet}
+      - HORIZON_URL=${HORIZON_URL:-}
+      - SOROBAN_RPC_URL=${SOROBAN_RPC_URL:-}
+
+      # Optional: Secret key for transaction signing
+      # WARNING: Only use with testnet/funded throwaway accounts
+      - STELLAR_SECRET_KEY=${STELLAR_SECRET_KEY:-}
+
+      # CLI configuration
+      - STELLAR_CLI_PATH=${STELLAR_CLI_PATH:-stellar}
+
+      # Logging
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+
+    # Keep the container running for MCP stdio transport
+    stdin_open: true
+    tty: true
+
+    # Optional: Add labels for metadata
+    labels:
+      - "app=pulsar"
+      - "network=${STELLAR_NETWORK:-testnet}"
+
+    # Optional: Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+    # Restart policy
+    restart: unless-stopped

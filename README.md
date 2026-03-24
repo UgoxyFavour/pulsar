@@ -211,6 +211,51 @@ npx pulsar
 
 This is the recommended approach for editor plugin configurations (see [Connecting to AI Assistants](#connecting-to-ai-assistants)).
 
+### Docker
+
+You can also run pulsar using Docker:
+
+```bash
+# Pull the image from GitHub Container Registry
+docker pull ghcr.io/benelabs/pulsar:latest
+
+# Run with environment variables
+docker run --rm -e STELLAR_NETWORK=testnet ghcr.io/benelabs/pulsar:latest
+
+# Run with a custom .env file
+docker run --rm --env-file .env ghcr.io/benelabs/pulsar:latest
+```
+
+#### Building from Source
+
+```bash
+# Build the Docker image
+docker build -t pulsar .
+
+# Run the container
+docker run --rm -e STELLAR_NETWORK=testnet pulsar
+```
+
+#### Docker Compose
+
+For local development with environment variable passthrough:
+
+```bash
+# Copy the example environment file
+cp .env.example .env
+
+# Edit .env with your configuration
+
+# Run with docker-compose
+docker-compose up
+```
+
+The `docker-compose.yml` includes:
+- Environment variable passthrough from `.env`
+- Resource limits (512MB memory, 1 CPU max)
+- Non-root user execution
+- Automatic restart policy
+
 ---
 
 ## Configuration
