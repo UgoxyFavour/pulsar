@@ -36,7 +36,6 @@ class PulsarServer {
   }
 
   private setupHandlers() {
-    // List available tools
     this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: [
         {
@@ -116,7 +115,6 @@ class PulsarServer {
       ],
     }));
 
-    // Handle tool execution
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
 
