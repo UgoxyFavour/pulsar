@@ -5,9 +5,11 @@ import { CallToolRequestSchema, ListToolsRequestSchema, ErrorCode, McpError } fr
 import { config } from "./config.js";
 import { fetchContractSpec, fetchContractSpecSchema } from "./tools/fetch_contract_spec.js";
 import { submitTransaction } from './tools/submit_transaction.js';
+import { simulateTransaction } from './tools/simulate_transaction.js';
 import {
   GetAccountBalanceInputSchema,
   SubmitTransactionInputSchema,
+  SimulateTransactionInputSchema,
 } from './schemas/tools.js';
 import logger from './logger.js';
 import { PulsarError, PulsarErrorCode, PulsarNetworkError, PulsarValidationError } from './errors.js';
@@ -114,6 +116,25 @@ class PulsarServer {
             required: ["contract_id"],
           },
         },
+        {
+          name: 'simulate_transaction',
+          description: 'Simulates a transaction on the Soroban RPC and returns results, footprint, fees, and events.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              xdr: {
+                type: 'string',
+                description: 'Base64-encoded XDR of the transaction envelope.',
+              },
+              network: {
+                type: 'string',
+                enum: ['mainnet', 'testnet', 'futurenet', 'custom'],
+                description: 'Override the configured network for this call.',
+              },
+            },
+            required: ['xdr'],
+          },
+        },
       ],
     }));
 
@@ -169,6 +190,57 @@ class PulsarServer {
       } catch (error) {
         return this.handleToolError(error, name);
       }
+      if (name === 'get_account_balance') {
+        const parsed = GetAccountBalanceInputSchema.safeParse(args);
+        if (!parsed.success) {
+          throw new Error(`Invalid input for get_account_balance: ${JSON.stringify(parsed.error.format())}`);
+        }
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                message: 'get_account_balance is not yet implemented',
+                input: parsed.data,
+              }),
+            },
+          ],
+        };
+      }
+
+      if (name === "fetch_contract_spec") {
+        const parsed = fetchContractSpecSchema.safeParse(args);
+        if (!parsed.success) {
+          throw new Error(`Invalid input: ${JSON.stringify(parsed.error.format())}`);
+        }
+        const result = await fetchContractSpec(parsed.data);
+        return { content: [{ type: "text", text: JSON.stringify(result) }] };
+      }
+
+      if (name === 'submit_transaction') {
+        const parsed = SubmitTransactionInputSchema.safeParse(args);
+        if (!parsed.success) {
+          throw new Error(`Invalid input for submit_transaction: ${JSON.stringify(parsed.error.format())}`);
+        }
+        const result = await submitTransaction(parsed.data);
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result) }],
+        };
+      }
+
+      if (name === 'simulate_transaction') {
+        const parsed = SimulateTransactionInputSchema.safeParse(args);
+        if (!parsed.success) {
+          throw new Error(`Invalid input for simulate_transaction: ${JSON.stringify(parsed.error.format())}`);
+        }
+        const result = await simulateTransaction(parsed.data);
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result) }],
+        };
+      }
+
+      throw new Error(`Tool not found: ${name}`);
     });
   }
 
