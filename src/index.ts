@@ -14,11 +14,15 @@ import { submitTransaction } from './tools/submit_transaction.js';
 import { simulateTransaction } from './tools/simulate_transaction.js';
 import { getAccountBalance } from './tools/get_account_balance.js';
 import { sorobanMath } from './tools/soroban_math.js';
+import { computeVestingSchedule } from './tools/compute_vesting_schedule.js';
+import { deployContract } from './tools/deploy_contract.js';
 import {
   GetAccountBalanceInputSchema,
   SubmitTransactionInputSchema,
   SimulateTransactionInputSchema,
   SorobanMathInputSchema,
+  ComputeVestingScheduleInputSchema,
+  DeployContractInputSchema,
 } from './schemas/tools.js';
 import logger from './logger.js';
 import { PulsarError, PulsarNetworkError, PulsarValidationError } from './errors.js';
@@ -233,6 +237,94 @@ class PulsarServer {
               value: { type: 'number', description: 'Numeric value for basis-point conversion.' },
             },
             required: ['operation'],
+          name: 'compute_vesting_schedule',
+          description: 'Calculate a token vesting / timelock release schedule for team, investors, or advisors. Returns released and unreleased amounts plus a period-by-period breakdown.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              total_amount: {
+                type: 'number',
+                description: 'Total token amount to vest.',
+              },
+              start_timestamp: {
+                type: 'number',
+                description: 'Unix timestamp when vesting begins.',
+              },
+              cliff_seconds: {
+                type: 'number',
+                description: 'Seconds before any tokens unlock (cliff period).',
+              },
+              vesting_duration_seconds: {
+                type: 'number',
+                description: 'Total vesting period in seconds.',
+              },
+              release_frequency_seconds: {
+                type: 'number',
+                description: 'How often tokens unlock after cliff (e.g. 2592000 for monthly).',
+              },
+              beneficiary_type: {
+                type: 'string',
+                enum: ['team', 'investor', 'advisor', 'other'],
+                description: 'Category of beneficiary.',
+              },
+              current_timestamp: {
+                type: 'number',
+                description: 'Optional override for current time as Unix timestamp.',
+              },
+            },
+            required: [
+              'total_amount',
+              'start_timestamp',
+              'cliff_seconds',
+              'vesting_duration_seconds',
+              'release_frequency_seconds',
+              'beneficiary_type',
+            ],
+          },
+        },
+        {
+          name: 'deploy_contract',
+          description:
+            "Builds a Stellar transaction for deploying a Soroban smart contract. Supports 'direct' mode (built-in deployer) or 'factory' mode (via a factory contract). Returns the unsigned transaction XDR and, for direct mode, the predicted deterministic contract address. Simulate before submitting.",
+          inputSchema: {
+            type: 'object',
+            properties: {
+              mode: {
+                type: 'string',
+                enum: ['direct', 'factory'],
+                description: "Deployment mode: 'direct' (built-in deployer) or 'factory' (via factory contract)",
+              },
+              source_account: {
+                type: 'string',
+                description: 'Stellar public key (G...) that will deploy the contract and pay fees.',
+              },
+              wasm_hash: {
+                type: 'string',
+                description: 'SHA-256 hash of the uploaded WASM as 64 hex characters. Required for direct mode.',
+              },
+              salt: {
+                type: 'string',
+                description: 'Optional 32-byte salt as 64 hex characters for deterministic address. Random if omitted.',
+              },
+              factory_contract_id: {
+                type: 'string',
+                description: 'Soroban contract ID (C...) of the factory contract. Required for factory mode.',
+              },
+              deploy_function: {
+                type: 'string',
+                description: "Factory deploy function name. Default: 'deploy'.",
+              },
+              deploy_args: {
+                type: 'array',
+                description: "Arguments for factory deploy function as typed SCVal objects. Each item: { type?: 'symbol'|'string'|'u32'|'i32'|'u64'|'i64'|'u128'|'i128'|'bool'|'address'|'bytes'|'void', value: any }",
+              },
+              network: {
+                type: 'string',
+                enum: ['mainnet', 'testnet', 'futurenet', 'custom'],
+                description: 'Override the configured network for this call.',
+              },
+            },
+            required: ['mode', 'source_account'],
           },
         },
       ],
@@ -314,6 +406,26 @@ class PulsarServer {
             }
             const result = await sorobanMath(parsed.data);
             return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+          case 'compute_vesting_schedule': {
+            const parsed = ComputeVestingScheduleInputSchema.safeParse(args);
+            if (!parsed.success) {
+              throw new PulsarValidationError(`Invalid input for compute_vesting_schedule`, parsed.error.format());
+            }
+            const result = await computeVestingSchedule(parsed.data);
+            return {
+              content: [{ type: 'text', text: JSON.stringify(result) }],
+            };
+          }
+
+          case 'deploy_contract': {
+            const parsed = DeployContractInputSchema.safeParse(args);
+            if (!parsed.success) {
+              throw new PulsarValidationError(`Invalid input for deploy_contract`, parsed.error.format());
+            }
+            const result = await deployContract(parsed.data);
+            return {
+              content: [{ type: 'text', text: JSON.stringify(result) }],
+            };
           }
 
           default:
