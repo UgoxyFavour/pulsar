@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "multisig_escrow",
+    "merkle_whitelist",
 ]
 
 [profile.release]
