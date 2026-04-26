@@ -8,10 +8,14 @@ import { fetchContractSpec, fetchContractSpecSchema } from "./tools/fetch_contra
 import { submitTransaction } from './tools/submit_transaction.js';
 import { simulateTransaction } from './tools/simulate_transaction.js';
 import { getAccountBalance } from './tools/get_account_balance.js';
+import { emergencyPause } from './tools/emergency_pause.js';
+import { generateContractDocs } from './tools/generate_contract_docs.js';
 import {
   GetAccountBalanceInputSchema,
   SubmitTransactionInputSchema,
   SimulateTransactionInputSchema,
+  EmergencyPauseInputSchema,
+  GenerateContractDocsInputSchema,
 } from './schemas/tools.js';
 import logger from './logger.js';
 import { PulsarError, PulsarNetworkError, PulsarValidationError } from './errors.js';
@@ -150,6 +154,70 @@ class PulsarServer {
             required: ['xdr'],
           },
         },
+        {
+          name: 'emergency_pause',
+          description:
+            'Circuit breaker: inspect a Soroban contract for pause/unpause capability and generate the recommended invocation. ' +
+            'Use action=inspect to check support, action=pause/unpause to get the invocation args. ' +
+            'Does NOT submit transactions — use submit_transaction to execute.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              contract_id: {
+                type: 'string',
+                description: 'The Soroban contract address (C...)',
+              },
+              network: {
+                type: 'string',
+                enum: ['mainnet', 'testnet', 'futurenet', 'custom'],
+                description: 'Override the configured network for this call.',
+              },
+              action: {
+                type: 'string',
+                enum: ['inspect', 'pause', 'unpause'],
+                default: 'inspect',
+                description: 'inspect: report pause capability; pause/unpause: return recommended invocation args.',
+              },
+              admin_address: {
+                type: 'string',
+                description: 'Optional admin/owner address to include in the recommended invocation.',
+              },
+            },
+            required: ['contract_id'],
+          },
+        },
+        {
+          name: 'generate_contract_docs',
+          description:
+            'Generate human-readable documentation for a Soroban contract. ' +
+            'Extracts function signatures, doc-comments, parameter types, and emitted event schemas from the contract ABI.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              contract_id: {
+                type: 'string',
+                description: 'The Soroban contract address (C...)',
+              },
+              network: {
+                type: 'string',
+                enum: ['mainnet', 'testnet', 'futurenet', 'custom'],
+                description: 'Override the configured network for this call.',
+              },
+              format: {
+                type: 'string',
+                enum: ['markdown', 'text'],
+                default: 'markdown',
+                description: 'Output format: markdown (default) or plain text.',
+              },
+              include_events: {
+                type: 'boolean',
+                default: true,
+                description: 'Include emitted event schemas in the output.',
+              },
+            },
+            required: ['contract_id'],
+          },
+        },
       ],
     }));
 
@@ -202,6 +270,28 @@ class PulsarServer {
               throw new PulsarValidationError(`Invalid input for simulate_transaction`, parsed.error.format());
             }
             const result = await simulateTransaction(parsed.data);
+            return {
+              content: [{ type: 'text', text: JSON.stringify(result) }],
+            };
+          }
+
+          case 'emergency_pause': {
+            const parsed = EmergencyPauseInputSchema.safeParse(args);
+            if (!parsed.success) {
+              throw new PulsarValidationError(`Invalid input for emergency_pause`, parsed.error.format());
+            }
+            const result = await emergencyPause(parsed.data);
+            return {
+              content: [{ type: 'text', text: JSON.stringify(result) }],
+            };
+          }
+
+          case 'generate_contract_docs': {
+            const parsed = GenerateContractDocsInputSchema.safeParse(args);
+            if (!parsed.success) {
+              throw new PulsarValidationError(`Invalid input for generate_contract_docs`, parsed.error.format());
+            }
+            const result = await generateContractDocs(parsed.data);
             return {
               content: [{ type: 'text', text: JSON.stringify(result) }],
             };
