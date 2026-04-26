@@ -35,6 +35,7 @@
   - [simulate_transaction](#simulate_transaction)
   - [decode_ledger_entry](#decode_ledger_entry)
   - [submit_transaction](#submit_transaction)
+  - [soroban_math](#soroban_math)
 - [Example Prompts & Workflows](#example-prompts--workflows)
 - [Soroban CLI Integration](#soroban-cli-integration)
 - [Development Guide](#development-guide)
@@ -88,6 +89,7 @@ There is currently **no community-driven MCP server** for Stellar, which means:
 | **Transaction Simulation** | Dry-run a Soroban transaction and inspect resource usage and return values before spending fees |
 | **Ledger Entry Decoding** | Decode raw XDR ledger entries into human-readable JSON |
 | **Transaction Submission** | Sign (via a provided secret key or external signer) and submit transactions to the network |
+| **Soroban Math** | Fixed-point arithmetic, statistical functions (mean, std dev, TWAP), and financial math (compound interest, basis points) compatible with Soroban's 7-decimal integer model |
 | **Multi-network** | Targets Mainnet, Testnet, Futurenet, or a custom RPC endpoint |
 | **Soroban CLI Backend** | Delegates complex operations to the official `stellar` / `soroban` CLI for maximum correctness |
 | **Structured Output** | All tool responses are typed JSON objects the AI can directly parse and act upon |
@@ -640,6 +642,52 @@ Sign (optionally) and submit a transaction to the Stellar network. If `STELLAR_S
 
 ---
 
+### `soroban_math`
+
+Perform fixed-point arithmetic, statistical, and financial math operations using Soroban-compatible 7-decimal integer representations. All numeric values are passed as strings to preserve precision with large integers.
+
+**Operations:**
+
+| `operation` | Description | Key Parameters |
+|---|---|---|
+| `fixed_add` | Add two fixed-point numbers | `a`, `b`, `decimals` |
+| `fixed_sub` | Subtract two fixed-point numbers | `a`, `b`, `decimals` |
+| `fixed_mul` | Multiply two fixed-point numbers | `a`, `b`, `decimals` |
+| `fixed_div` | Divide two fixed-point numbers | `a`, `b`, `decimals` |
+| `mean` | Arithmetic mean of a list of values | `values[]`, `decimals` |
+| `weighted_mean` | Weighted mean of values with corresponding weights | `values[]`, `weights[]`, `decimals` |
+| `std_dev` | Population standard deviation | `values[]` (≥ 2), `decimals` |
+| `twap` | Time-weighted average price | `prices[]{price, timestamp}` (≥ 2), `decimals` |
+| `compound_interest` | Compound interest final amount | `principal`, `rate_bps`, `periods`, `compounds_per_period`, `decimals` |
+| `basis_points_to_percent` | Convert basis points to a percentage | `value` |
+| `percent_to_basis_points` | Convert a percentage to basis points | `value` |
+
+**Common Parameters:**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `operation` | `string` | Yes | One of the operation names above |
+| `decimals` | `integer` | No | Fixed-point decimal places (0–18, default `7` — Stellar's standard) |
+
+**Output:**
+
+```jsonc
+{
+  "operation": "fixed_mul",
+  "result": "10000000",     // raw integer string
+  "human_readable": "1.0000000",
+  "decimals": 7
+}
+```
+
+For `basis_points_to_percent` / `percent_to_basis_points` the output contains only `operation` and `result` (a number, not a fixed-point integer).
+
+**Example prompt:**
+
+> _"What is the compound interest on a principal of 1,000 USDC at 5% annual rate (500 bps) over 12 monthly periods?"_
+
+---
+
 ## Example Prompts & Workflows
 
 These are real-world workflows that become possible once pulsar is connected to your AI assistant.
@@ -821,6 +869,7 @@ npm run typecheck
 - [x] `simulate_transaction` — dry-run via Soroban RPC
 - [x] `decode_ledger_entry` — XDR decode
 - [x] `submit_transaction` — broadcast + wait for result
+- [x] `soroban_math` — fixed-point, statistical, and financial math
 - [ ] `get_transaction_history` — paginated history for an account
 - [ ] `stream_events` — subscribe to Soroban contract events
 - [ ] `build_transaction` — construct a Soroban invoke transaction from contract spec + args (without needing pre-built XDR)
