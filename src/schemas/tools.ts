@@ -6,21 +6,21 @@
  * before any RPC calls are made.
  */
 
-import { z } from "zod";
+import { z } from 'zod';
 
 import {
   StellarPublicKeySchema,
   ContractIdSchema,
   XdrBase64Schema,
   NetworkSchema,
-} from "./index.js";
+} from './index.js';
 
 const Hex32Schema = z
   .string()
   .regex(/^[a-fA-F0-9]{64}$/, {
-    message: "Must be a 64-character hex string (32 bytes)",
+    message: 'Must be a 64-character hex string (32 bytes)',
   })
-  .describe("32-byte value encoded as 64 hex characters");
+  .describe('32-byte value encoded as 64 hex characters');
 
 /**
  * Schema for get_account_balance tool
@@ -36,9 +36,7 @@ export const GetAccountBalanceInputSchema = z.object({
   asset_issuer: StellarPublicKeySchema.optional(),
 });
 
-export type GetAccountBalanceInput = z.infer<
-  typeof GetAccountBalanceInputSchema
->;
+export type GetAccountBalanceInput = z.infer<typeof GetAccountBalanceInputSchema>;
 
 /**
  * Schema for submit_transaction tool
@@ -58,14 +56,12 @@ export const SubmitTransactionInputSchema = z.object({
   wait_timeout_ms: z
     .number()
     .int()
-    .min(1000, { message: "wait_timeout_ms must be at least 1000 ms" })
-    .max(120_000, { message: "wait_timeout_ms must not exceed 120000 ms" })
+    .min(1000, { message: 'wait_timeout_ms must be at least 1000 ms' })
+    .max(120_000, { message: 'wait_timeout_ms must not exceed 120000 ms' })
     .default(30_000),
 });
 
-export type SubmitTransactionInput = z.infer<
-  typeof SubmitTransactionInputSchema
->;
+export type SubmitTransactionInput = z.infer<typeof SubmitTransactionInputSchema>;
 
 /**
  * Schema for potential future contract_read tool.
@@ -75,9 +71,9 @@ export const ContractReadInputSchema = z.object({
   contract_id: ContractIdSchema,
   method: z
     .string()
-    .min(1, { message: "Method name cannot be empty" })
+    .min(1, { message: 'Method name cannot be empty' })
     .regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/, {
-      message: "Method name must be a valid identifier",
+      message: 'Method name must be a valid identifier',
     }),
   args: z.record(z.unknown()).optional(),
 });
@@ -96,9 +92,7 @@ export const SimulateTransactionInputSchema = z.object({
   network: NetworkSchema.optional(),
 });
 
-export type SimulateTransactionInput = z.infer<
-  typeof SimulateTransactionInputSchema
->;
+export type SimulateTransactionInput = z.infer<typeof SimulateTransactionInputSchema>;
 
 /**
  * Schema for compute_vesting_schedule tool
@@ -113,39 +107,32 @@ export type SimulateTransactionInput = z.infer<
  * - current_timestamp: Optional override for "now" (defaults to current time)
  */
 export const ComputeVestingScheduleInputSchema = z.object({
-  total_amount: z
-    .number()
-    .positive({ message: "total_amount must be positive" }),
+  total_amount: z.number().positive({ message: 'total_amount must be positive' }),
   start_timestamp: z
     .number()
     .int()
-    .positive({ message: "start_timestamp must be a positive Unix timestamp" }),
-  cliff_seconds: z
-    .number()
-    .int()
-    .nonnegative({ message: "cliff_seconds must be non-negative" }),
+    .positive({ message: 'start_timestamp must be a positive Unix timestamp' }),
+  cliff_seconds: z.number().int().nonnegative({ message: 'cliff_seconds must be non-negative' }),
   vesting_duration_seconds: z
     .number()
     .int()
-    .positive({ message: "vesting_duration_seconds must be positive" }),
+    .positive({ message: 'vesting_duration_seconds must be positive' }),
   release_frequency_seconds: z
     .number()
     .int()
-    .positive({ message: "release_frequency_seconds must be positive" }),
+    .positive({ message: 'release_frequency_seconds must be positive' }),
   beneficiary_type: z
-    .enum(["team", "investor", "advisor", "other"])
-    .describe("Type of beneficiary receiving the vesting tokens"),
+    .enum(['team', 'investor', 'advisor', 'other'])
+    .describe('Type of beneficiary receiving the vesting tokens'),
   current_timestamp: z
     .number()
     .int()
     .positive()
     .optional()
-    .describe("Optional override for current time as Unix timestamp"),
+    .describe('Optional override for current time as Unix timestamp'),
 });
 
-export type ComputeVestingScheduleInput = z.infer<
-  typeof ComputeVestingScheduleInputSchema
->;
+export type ComputeVestingScheduleInput = z.infer<typeof ComputeVestingScheduleInputSchema>;
 
 /**
  * Schema for deploy_contract tool
@@ -166,19 +153,19 @@ export type ComputeVestingScheduleInput = z.infer<
  */
 export const DeployContractInputSchema = z.object({
   mode: z
-    .enum(["direct", "factory"])
-    .describe("Deployment mode: direct (built-in deployer) or factory (via factory contract)"),
+    .enum(['direct', 'factory'])
+    .describe('Deployment mode: direct (built-in deployer) or factory (via factory contract)'),
   source_account: StellarPublicKeySchema.describe(
-    "The Stellar account that will deploy the contract and pay fees"
+    'The Stellar account that will deploy the contract and pay fees'
   ),
   wasm_hash: Hex32Schema.optional().describe(
-    "SHA-256 hash of the uploaded WASM (64 hex chars). Required for direct mode."
+    'SHA-256 hash of the uploaded WASM (64 hex chars). Required for direct mode.'
   ),
   salt: Hex32Schema.optional().describe(
-    "Optional 32-byte salt for deterministic contract address (64 hex chars). Random if omitted."
+    'Optional 32-byte salt for deterministic contract address (64 hex chars). Random if omitted.'
   ),
   factory_contract_id: ContractIdSchema.optional().describe(
-    "Factory contract ID. Required for factory mode."
+    'Factory contract ID. Required for factory mode.'
   ),
   deploy_function: z
     .string()
@@ -190,28 +177,131 @@ export const DeployContractInputSchema = z.object({
       z.object({
         type: z
           .enum([
-            "symbol",
-            "string",
-            "u32",
-            "i32",
-            "u64",
-            "i64",
-            "u128",
-            "i128",
-            "bool",
-            "address",
-            "bytes",
-            "void",
+            'symbol',
+            'string',
+            'u32',
+            'i32',
+            'u64',
+            'i64',
+            'u128',
+            'i128',
+            'bool',
+            'address',
+            'bytes',
+            'void',
           ])
           .optional()
-          .describe("Soroban SCVal type hint"),
-        value: z.unknown().describe("The value to convert to SCVal"),
+          .describe('Soroban SCVal type hint'),
+        value: z.unknown().describe('The value to convert to SCVal'),
       })
     )
     .optional()
-    .describe("Arguments for factory deploy function as typed SCVal objects"),
+    .describe('Arguments for factory deploy function as typed SCVal objects'),
   network: NetworkSchema.optional(),
 });
 
 export type DeployContractInput = z.infer<typeof DeployContractInputSchema>;
 
+/**
+ * Schema for build_conditional_transaction tool
+ *
+ * Takes an existing unsigned transaction XDR and embeds Stellar-native
+ * preconditions (time bounds, ledger bounds, sequence guards) into the
+ * envelope. Optionally validates those conditions against the live ledger
+ * before returning.
+ *
+ * Inputs:
+ * - xdr: Unsigned transaction envelope to attach conditions to (required)
+ * - conditions: At least one of time_bounds | ledger_bounds | min_sequence_*
+ * - validate_now: Check conditions against current ledger state (default: false)
+ * - network: Optional network override
+ */
+export const BuildConditionalTransactionInputSchema = z
+  .object({
+    xdr: XdrBase64Schema,
+    conditions: z
+      .object({
+        time_bounds: z
+          .object({
+            min_time: z
+              .number()
+              .int()
+              .nonnegative()
+              .optional()
+              .describe('Earliest Unix timestamp at which the transaction is valid'),
+            max_time: z
+              .number()
+              .int()
+              .nonnegative()
+              .optional()
+              .describe('Latest Unix timestamp at which the transaction is valid (0 = no expiry)'),
+          })
+          .optional()
+          .describe('Validity window expressed as Unix timestamps'),
+        ledger_bounds: z
+          .object({
+            min_ledger: z
+              .number()
+              .int()
+              .nonnegative()
+              .optional()
+              .describe('Minimum ledger sequence at which the transaction is valid'),
+            max_ledger: z
+              .number()
+              .int()
+              .nonnegative()
+              .optional()
+              .describe('Maximum ledger sequence at which the transaction is valid (0 = no cap)'),
+          })
+          .optional()
+          .describe('Validity window expressed as ledger sequence numbers'),
+        min_sequence_number: z
+          .string()
+          .regex(/^\d+$/, { message: 'Must be a non-negative integer string' })
+          .optional()
+          .describe(
+            'Source account must have at least this sequence number for the transaction to be valid'
+          ),
+        min_sequence_age: z
+          .number()
+          .int()
+          .nonnegative()
+          .optional()
+          .describe(
+            'Minimum seconds elapsed since the source account last changed its sequence number'
+          ),
+        min_sequence_ledger_gap: z
+          .number()
+          .int()
+          .nonnegative()
+          .optional()
+          .describe(
+            'Minimum number of ledgers that must have closed since the source account last changed its sequence number'
+          ),
+      })
+      .describe('Preconditions to embed in the transaction envelope'),
+    validate_now: z
+      .boolean()
+      .default(false)
+      .describe(
+        'When true, evaluate each condition against the current ledger/account state and report which ones pass or fail'
+      ),
+    network: NetworkSchema.optional(),
+  })
+  .refine(
+    (data) => {
+      const c = data.conditions;
+      return (
+        c.time_bounds !== undefined ||
+        c.ledger_bounds !== undefined ||
+        c.min_sequence_number !== undefined ||
+        c.min_sequence_age !== undefined ||
+        c.min_sequence_ledger_gap !== undefined
+      );
+    },
+    { message: 'At least one condition must be specified', path: ['conditions'] }
+  );
+
+export type BuildConditionalTransactionInput = z.infer<
+  typeof BuildConditionalTransactionInputSchema
+>;
