@@ -8,7 +8,6 @@ import { fetchContractSpec, fetchContractSpecSchema } from "./tools/fetch_contra
 import { submitTransaction } from './tools/submit_transaction.js';
 import { simulateTransaction } from './tools/simulate_transaction.js';
 import { getAccountBalance } from './tools/get_account_balance.js';
-import { getAccountHistory } from './tools/get_account_history.js';
 import { computeVestingSchedule } from './tools/compute_vesting_schedule.js';
 import { deployContract } from './tools/deploy_contract.js';
 import {
@@ -17,7 +16,6 @@ import {
   SimulateTransactionInputSchema,
   ComputeVestingScheduleInputSchema,
   DeployContractInputSchema,
-  GetAccountHistoryInputSchema,
 } from './schemas/tools.js';
 import logger from './logger.js';
 import { PulsarError, PulsarNetworkError, PulsarValidationError } from './errors.js';
@@ -247,22 +245,6 @@ class PulsarServer {
             required: ['mode', 'source_account'],
           },
         },
-      ,
-      {
-        name: 'get_account_history',
-        description: 'Fetch recent transaction history for a Stellar account. Returns structured records with hash, ledger, timestamp, fee, operation count, and success status. Supports pagination via cursor.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            account_id: { type: 'string', description: 'The Stellar public key (G...)' },
-            network: { type: 'string', enum: ['mainnet', 'testnet', 'futurenet', 'custom'], description: 'Override the configured network.' },
-            limit: { type: 'number', description: 'Number of transactions to return (1-200, default 10).' },
-            cursor: { type: 'string', description: 'Paging token from a previous response.' },
-            order: { type: 'string', enum: ['asc', 'desc'], description: 'Sort order (default: desc).' },
-          },
-          required: ['account_id'],
-        },
-      },
       ],
     }));
 
@@ -342,16 +324,7 @@ class PulsarServer {
             };
           }
 
-          case 'get_account_history': {
-                const parsed = GetAccountHistoryInputSchema.safeParse(args);
-                if (!parsed.success) {
-                  throw new PulsarValidationError(`Invalid input for get_account_history`, parsed.error.format());
-                }
-                const result = await getAccountHistory(parsed.data);
-                return { content: [{ type: 'text', text: JSON.stringify(result) }] };
-              }
-
-              default:
+          default:
             throw new McpError(ErrorCode.MethodNotFound, `Tool not found: ${name}`);
         }
       } catch (error) {
