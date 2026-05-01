@@ -94,7 +94,86 @@ export const SimulateTransactionInputSchema = z.object({
 
 export type SimulateTransactionInput = z.infer<typeof SimulateTransactionInputSchema>;
 
+const fixedArithFields = {
+  a: z.string().min(1),
+  b: z.string().min(1),
+  decimals: z.number().int().min(0).max(18).default(7),
+};
+
+export const SorobanMathInputSchema = z.discriminatedUnion('operation', [
+  z.object({ operation: z.literal('fixed_add'), ...fixedArithFields }),
+  z.object({ operation: z.literal('fixed_sub'), ...fixedArithFields }),
+  z.object({ operation: z.literal('fixed_mul'), ...fixedArithFields }),
+  z.object({ operation: z.literal('fixed_div'), ...fixedArithFields }),
+  z.object({
+    operation: z.literal('mean'),
+    values: z.array(z.string().min(1)).min(1),
+    decimals: z.number().int().min(0).max(18).default(7),
+  }),
+  z.object({
+    operation: z.literal('weighted_mean'),
+    values: z.array(z.string().min(1)).min(1),
+    weights: z.array(z.string().min(1)).min(1),
+    decimals: z.number().int().min(0).max(18).default(7),
+  }),
+  z.object({
+    operation: z.literal('std_dev'),
+    values: z.array(z.string().min(1)).min(2),
+    decimals: z.number().int().min(0).max(18).default(7),
+  }),
+  z.object({
+    operation: z.literal('twap'),
+    prices: z.array(z.object({ price: z.string().min(1), timestamp: z.number().int() })).min(2),
+    decimals: z.number().int().min(0).max(18).default(7),
+  }),
+  z.object({
+    operation: z.literal('compound_interest'),
+    principal: z.string().min(1),
+    rate_bps: z.number().int().min(0),
+    periods: z.number().int().min(1),
+    compounds_per_period: z.number().int().min(1).default(1),
+    decimals: z.number().int().min(0).max(18).default(7),
+  }),
+  z.object({ operation: z.literal('basis_points_to_percent'), value: z.number() }),
+  z.object({ operation: z.literal('percent_to_basis_points'), value: z.number() }),
+]);
+
+export type SorobanMathInput = z.infer<typeof SorobanMathInputSchema>;
 /**
+ * Schema for emergency_pause tool (circuit breaker)
+ *
+ * Inputs:
+ * - contract_id: Soroban contract address (required)
+ * - network: Optional network override
+ * - action: inspect | pause | unpause (default: inspect)
+ * - admin_address: Optional admin address for invocation args
+ */
+export const EmergencyPauseInputSchema = z.object({
+  contract_id: ContractIdSchema,
+  network: NetworkSchema.optional(),
+  action: z.enum(["inspect", "pause", "unpause"]).default("inspect"),
+  admin_address: z.string().optional(),
+});
+
+export type EmergencyPauseInput = z.infer<typeof EmergencyPauseInputSchema>;
+
+/**
+ * Schema for generate_contract_docs tool
+ *
+ * Inputs:
+ * - contract_id: Soroban contract address (required)
+ * - network: Optional network override
+ * - format: markdown | text (default: markdown)
+ * - include_events: Whether to include events (default: true)
+ */
+export const GenerateContractDocsInputSchema = z.object({
+  contract_id: ContractIdSchema,
+  network: NetworkSchema.optional(),
+  format: z.enum(["markdown", "text"]).default("markdown"),
+  include_events: z.boolean().default(true),
+});
+
+export type GenerateContractDocsInput = z.infer<typeof GenerateContractDocsInputSchema>;
  * Schema for compute_vesting_schedule tool
  *
  * Inputs:
@@ -243,3 +322,164 @@ export const GenerateContractClientInputSchema = z.object({
 });
 
 export type GenerateContractClientInput = z.infer<typeof GenerateContractClientInputSchema>;
+ * Schema for soulbound_token tool
+ *
+ * Actions:
+ * - mint:   Issue a non-transferable SBT to a recipient (requires recipient, metadata).
+ * - revoke: Revoke an existing SBT by token_id (requires token_id).
+ * - query:  Build a read-only has_token invocation (requires recipient; simulate to read result).
+ */
+export const SoulboundTokenInputSchema = z
+  .object({
+    action: z.enum(['mint', 'revoke', 'query']).describe('SBT operation: mint, revoke, or query'),
+    contract_id: ContractIdSchema.describe('Deployed SBT contract address (C...)'),
+    source_account: StellarPublicKeySchema.describe(
+      'Stellar public key (G...) that signs and pays fees'
+    ),
+    recipient: StellarPublicKeySchema.optional().describe(
+      'Recipient public key (G...). Required for mint and query.'
+    ),
+    token_id: z
+      .string()
+      .min(1)
+      .optional()
+      .describe(
+        'Unique token identifier. Required for revoke; auto-generated for mint if omitted.'
+      ),
+    metadata: z
+      .string()
+      .min(1)
+      .optional()
+      .describe('Arbitrary metadata string (e.g. JSON) attached to the token. Required for mint.'),
+    network: NetworkSchema.optional(),
+  })
+  .describe('Input for the soulbound_token tool');
+
+export type SoulboundTokenInput = z.infer<typeof SoulboundTokenInputSchema>;
+ * Schema for build_conditional_transaction tool
+ *
+ * Takes an existing unsigned transaction XDR and embeds Stellar-native
+ * preconditions (time bounds, ledger bounds, sequence guards) into the
+ * envelope. Optionally validates those conditions against the live ledger
+ * before returning.
+ *
+ * Inputs:
+ * - xdr: Unsigned transaction envelope to attach conditions to (required)
+ * - conditions: At least one of time_bounds | ledger_bounds | min_sequence_*
+ * - validate_now: Check conditions against current ledger state (default: false)
+ * - network: Optional network override
+ */
+export const BuildConditionalTransactionInputSchema = z
+  .object({
+    xdr: XdrBase64Schema,
+    conditions: z
+      .object({
+        time_bounds: z
+          .object({
+            min_time: z
+              .number()
+              .int()
+              .nonnegative()
+              .optional()
+              .describe('Earliest Unix timestamp at which the transaction is valid'),
+            max_time: z
+              .number()
+              .int()
+              .nonnegative()
+              .optional()
+              .describe('Latest Unix timestamp at which the transaction is valid (0 = no expiry)'),
+          })
+          .optional()
+          .describe('Validity window expressed as Unix timestamps'),
+        ledger_bounds: z
+          .object({
+            min_ledger: z
+              .number()
+              .int()
+              .nonnegative()
+              .optional()
+              .describe('Minimum ledger sequence at which the transaction is valid'),
+            max_ledger: z
+              .number()
+              .int()
+              .nonnegative()
+              .optional()
+              .describe('Maximum ledger sequence at which the transaction is valid (0 = no cap)'),
+          })
+          .optional()
+          .describe('Validity window expressed as ledger sequence numbers'),
+        min_sequence_number: z
+          .string()
+          .regex(/^\d+$/, { message: 'Must be a non-negative integer string' })
+          .optional()
+          .describe(
+            'Source account must have at least this sequence number for the transaction to be valid'
+          ),
+        min_sequence_age: z
+          .number()
+          .int()
+          .nonnegative()
+          .optional()
+          .describe(
+            'Minimum seconds elapsed since the source account last changed its sequence number'
+          ),
+        min_sequence_ledger_gap: z
+          .number()
+          .int()
+          .nonnegative()
+          .optional()
+          .describe(
+            'Minimum number of ledgers that must have closed since the source account last changed its sequence number'
+          ),
+      })
+      .describe('Preconditions to embed in the transaction envelope'),
+    validate_now: z
+      .boolean()
+      .default(false)
+      .describe(
+        'When true, evaluate each condition against the current ledger/account state and report which ones pass or fail'
+      ),
+    network: NetworkSchema.optional(),
+  })
+  .refine(
+    (data) => {
+      const c = data.conditions;
+      return (
+        c.time_bounds !== undefined ||
+        c.ledger_bounds !== undefined ||
+        c.min_sequence_number !== undefined ||
+        c.min_sequence_age !== undefined ||
+        c.min_sequence_ledger_gap !== undefined
+      );
+    },
+    { message: 'At least one condition must be specified', path: ['conditions'] }
+  );
+
+export type BuildConditionalTransactionInput = z.infer<
+  typeof BuildConditionalTransactionInputSchema
+>;
+ * Schema for batch_events tool
+ *
+ * Inputs:
+ * - events: Array of base64 XDR strings (ContractEvent or DiagnosticEvent) to batch
+ * - group_by: Strategy for grouping events (default: contract_and_topic)
+ * - deduplicate: Whether to collapse identical events into one with a count (default: true)
+ */
+export const BatchEventsInputSchema = z.object({
+  events: z
+    .array(XdrBase64Schema)
+    .min(1, { message: 'At least one event XDR is required' })
+    .describe('Array of base64 XDR Soroban ContractEvent or DiagnosticEvent strings'),
+  group_by: z
+    .enum(['contract', 'topic', 'contract_and_topic'])
+    .default('contract_and_topic')
+    .describe(
+      "Grouping strategy: 'contract' (by contract ID), 'topic' (by event topics), or 'contract_and_topic' (both)"
+    ),
+  deduplicate: z
+    .boolean()
+    .default(true)
+    .describe('Collapse identical events into a single entry with an occurrence count'),
+});
+
+export type BatchEventsInput = z.infer<typeof BatchEventsInputSchema>;
