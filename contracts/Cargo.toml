@@ -2,6 +2,8 @@
 resolver = "2"
 members = [
     "multisig_escrow",
+    "reference",
+    "sep41-token"
 ]
 
 [profile.release]
@@ -10,6 +12,7 @@ overflow-checks = true
 debug = 0
 strip = "symbols"
 debug-assertions = false
+strip = "debuginfo"
 panic = "abort"
 codegen-units = 1
 lto = true
@@ -17,3 +20,4 @@ lto = true
 [profile.release-with-logs]
 inherits = "release"
 debug-assertions = true
+debug = true
