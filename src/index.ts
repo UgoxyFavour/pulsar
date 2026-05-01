@@ -13,6 +13,8 @@ import { fetchContractSpec, fetchContractSpecSchema } from './tools/fetch_contra
 import { submitTransaction } from './tools/submit_transaction.js';
 import { simulateTransaction } from './tools/simulate_transaction.js';
 import { getAccountBalance } from './tools/get_account_balance.js';
+import { emergencyPause } from './tools/emergency_pause.js';
+import { generateContractDocs } from './tools/generate_contract_docs.js';
 import { sorobanMath } from './tools/soroban_math.js';
 
 // ✅ merged imports (FIXED)
@@ -24,6 +26,8 @@ import {
   GetAccountBalanceInputSchema,
   SubmitTransactionInputSchema,
   SimulateTransactionInputSchema,
+  EmergencyPauseInputSchema,
+  GenerateContractDocsInputSchema,
   SorobanMathInputSchema,
   ComputeVestingScheduleInputSchema,
   DeployContractInputSchema,
@@ -131,6 +135,69 @@ class PulsarServer {
           },
         },
         {
+          name: 'emergency_pause',
+          description:
+            'Circuit breaker: inspect a Soroban contract for pause/unpause capability and generate the recommended invocation. ' +
+            'Use action=inspect to check support, action=pause/unpause to get the invocation args. ' +
+            'Does NOT submit transactions — use submit_transaction to execute.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              contract_id: {
+                type: 'string',
+                description: 'The Soroban contract address (C...)',
+              },
+              network: {
+                type: 'string',
+                enum: ['mainnet', 'testnet', 'futurenet', 'custom'],
+                description: 'Override the configured network for this call.',
+              },
+              action: {
+                type: 'string',
+                enum: ['inspect', 'pause', 'unpause'],
+                default: 'inspect',
+                description: 'inspect: report pause capability; pause/unpause: return recommended invocation args.',
+              },
+              admin_address: {
+                type: 'string',
+                description: 'Optional admin/owner address to include in the recommended invocation.',
+              },
+            },
+            required: ['contract_id'],
+          },
+        },
+        {
+          name: 'generate_contract_docs',
+          description:
+            'Generate human-readable documentation for a Soroban contract. ' +
+            'Extracts function signatures, doc-comments, parameter types, and emitted event schemas from the contract ABI.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              contract_id: {
+                type: 'string',
+                description: 'The Soroban contract address (C...)',
+              },
+              network: {
+                type: 'string',
+                enum: ['mainnet', 'testnet', 'futurenet', 'custom'],
+                description: 'Override the configured network for this call.',
+              },
+              format: {
+                type: 'string',
+                enum: ['markdown', 'text'],
+                default: 'markdown',
+                description: 'Output format: markdown (default) or plain text.',
+              },
+              include_events: {
+                type: 'boolean',
+                default: true,
+                description: 'Include emitted event schemas in the output.',
+              },
+            },
+            required: ['contract_id'],
+          name: 'compute_vesting_schedule',
+          description: 'Calculate a token vesting / timelock release schedule for team, investors, or advisors. Returns released and unreleased amounts plus a period-by-period breakdown.',
           name: 'soroban_math',
           description:
             'Perform financial math on Soroban fixed-point integers (scaled by 10^decimals, default 7). ' +
@@ -316,6 +383,14 @@ class PulsarServer {
             return { content: [{ type: 'text', text: JSON.stringify(result) }] };
           }
 
+          case 'emergency_pause': {
+            const parsed = EmergencyPauseInputSchema.safeParse(args);
+            if (!parsed.success) {
+              throw new PulsarValidationError(`Invalid input for emergency_pause`, parsed.error.format());
+            }
+            const result = await emergencyPause(parsed.data);
+          case 'compute_vesting_schedule': {
+            const parsed = ComputeVestingScheduleInputSchema.safeParse(args);
           case 'decode_ledger_entry': {
             const parsed = decodeLedgerEntrySchema.parse(args);
             const result = await decodeLedgerEntryTool(parsed);
@@ -344,6 +419,12 @@ class PulsarServer {
             return { content: [{ type: 'text', text: JSON.stringify(result) }] };
           }
 
+          case 'generate_contract_docs': {
+            const parsed = GenerateContractDocsInputSchema.safeParse(args);
+            if (!parsed.success) {
+              throw new PulsarValidationError(`Invalid input for generate_contract_docs`, parsed.error.format());
+            }
+            const result = await generateContractDocs(parsed.data);
           case 'deploy_contract': {
             const parsed = DeployContractInputSchema.parse(args);
             const result = await deployContract(parsed);

@@ -140,6 +140,40 @@ export const SorobanMathInputSchema = z.discriminatedUnion('operation', [
 
 export type SorobanMathInput = z.infer<typeof SorobanMathInputSchema>;
 /**
+ * Schema for emergency_pause tool (circuit breaker)
+ *
+ * Inputs:
+ * - contract_id: Soroban contract address (required)
+ * - network: Optional network override
+ * - action: inspect | pause | unpause (default: inspect)
+ * - admin_address: Optional admin address for invocation args
+ */
+export const EmergencyPauseInputSchema = z.object({
+  contract_id: ContractIdSchema,
+  network: NetworkSchema.optional(),
+  action: z.enum(["inspect", "pause", "unpause"]).default("inspect"),
+  admin_address: z.string().optional(),
+});
+
+export type EmergencyPauseInput = z.infer<typeof EmergencyPauseInputSchema>;
+
+/**
+ * Schema for generate_contract_docs tool
+ *
+ * Inputs:
+ * - contract_id: Soroban contract address (required)
+ * - network: Optional network override
+ * - format: markdown | text (default: markdown)
+ * - include_events: Whether to include events (default: true)
+ */
+export const GenerateContractDocsInputSchema = z.object({
+  contract_id: ContractIdSchema,
+  network: NetworkSchema.optional(),
+  format: z.enum(["markdown", "text"]).default("markdown"),
+  include_events: z.boolean().default(true),
+});
+
+export type GenerateContractDocsInput = z.infer<typeof GenerateContractDocsInputSchema>;
  * Schema for compute_vesting_schedule tool
  *
  * Inputs:
