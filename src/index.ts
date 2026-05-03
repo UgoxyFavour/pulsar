@@ -299,6 +299,8 @@ class PulsarServer {
             'Fetch the ABI/interface spec of a deployed Soroban contract. Returns decoded function signatures, parameter types, and emitted event schemas.',
           description:
             'Fetch the ABI/interface spec of a deployed Soroban contract. Returns decoded function signatures, parameter types, and emitted event schemas.',
+          description:
+            'Fetch the ABI/interface spec of a deployed Soroban contract. Returns decoded function signatures, parameter types, and emitted event schemas.',
           inputSchema: {
             type: 'object',
           description:
@@ -606,6 +608,11 @@ class PulsarServer {
                 description:
                   "Arguments for factory deploy function as typed SCVal objects. Each item: { type?: 'symbol'|'string'|'u32'|'i32'|'u64'|'i64'|'u128'|'i128'|'bool'|'address'|'bytes'|'void', value: any }",
               },
+              optimize_cross_contract_call: {
+                type: 'boolean',
+                default: false,
+                description:
+                  'Factory mode only. Simulate and assemble the transaction to minimize cross-contract call resource overhead before returning XDR.',
               network: {
               address: {
                 type: 'string',
@@ -1729,7 +1736,10 @@ class PulsarServer {
           case 'fetch_contract_spec': {
             const parsed = fetchContractSpecSchema.safeParse(args);
             if (!parsed.success) {
-              throw new PulsarValidationError(`Invalid input for fetch_contract_spec`, parsed.error.format());
+              throw new PulsarValidationError(
+                `Invalid input for fetch_contract_spec`,
+                parsed.error.format()
+              );
             }
             const result = await fetchContractSpec(parsed.data);
             return { content: [{ type: "text", text: JSON.stringify(result) }] };

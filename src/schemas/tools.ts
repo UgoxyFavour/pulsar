@@ -336,6 +336,7 @@ export type ComputeVestingScheduleInput = z.infer<typeof ComputeVestingScheduleI
  * - factory_contract_id: Factory contract ID (required for factory)
  * - deploy_function: Factory deploy function name (default: 'deploy')
  * - deploy_args: Array of typed SCVal arguments for factory deploy function
+ * - optimize_cross_contract_call: Optional simulation+assembly for factory mode
  * - network: Optional network override
  */
 export const DeployContractInputSchema = z.object({
@@ -384,6 +385,12 @@ export const DeployContractInputSchema = z.object({
     )
     .optional()
     .describe('Arguments for factory deploy function as typed SCVal objects'),
+  optimize_cross_contract_call: z
+    .boolean()
+    .optional()
+    .describe(
+      'If true in factory mode, simulates and assembles the transaction to minimize cross-contract resource overhead'
+    ),
   network: NetworkSchema.optional(),
 });
 
