@@ -5,6 +5,7 @@ export enum PulsarErrorCode {
   NOT_FOUND_ERROR = 'NOT_FOUND_ERROR',
   INTERNAL_ERROR = 'INTERNAL_ERROR',
   PARTITION_DETECTED = 'PARTITION_DETECTED',
+  RESTRICTED_ADDRESS = 'RESTRICTED_ADDRESS',
 }
 
 export class PulsarError extends Error {
@@ -51,5 +52,13 @@ export class PulsarPartitionError extends PulsarError {
   constructor(message: string, details?: any) {
     super(PulsarErrorCode.PARTITION_DETECTED, message, details);
     this.name = 'PulsarPartitionError';
+export class PulsarRestrictedAddressError extends PulsarError {
+  constructor(address: string, toolName: string) {
+    super(
+      PulsarErrorCode.RESTRICTED_ADDRESS,
+      `Address '${address}' is restricted and cannot be used with tool '${toolName}'`,
+      { address, tool: toolName }
+    );
+    this.name = 'PulsarRestrictedAddressError';
   }
 }
