@@ -28,6 +28,8 @@ import { sorobanMath } from './tools/soroban_math.js';
 import { decodeLedgerEntryTool, decodeLedgerEntrySchema } from './tools/decode_ledger_entry.js';
 import { computeVestingSchedule } from './tools/compute_vesting_schedule.js';
 import { deployContract } from './tools/deploy_contract.js';
+import { manageSubscription } from './tools/manage_subscription.js';
+import { analyzeContractStorage } from './tools/analyze_contract_storage.js';
 import { getNetworkParams } from './tools/get_network_params.js';
 import { getContractStorage } from "./tools/get_contract_storage.js";
 import { getLiquidityPool, GetLiquidityPoolInputSchema } from './tools/get_liquidity_pool.js';
@@ -56,6 +58,8 @@ import {
   SorobanMathInputSchema,
   ComputeVestingScheduleInputSchema,
   DeployContractInputSchema,
+  ManageSubscriptionInputSchema,
+  AnalyzeContractStorageInputSchema,
   GetNetworkParamsInputSchema,
   ToolErrorOutputSchema,
   ToolNameSchema,
@@ -796,6 +800,29 @@ class PulsarServer {
           },
         },
         {
+          name: 'fetch_contract_spec',
+          description:
+            'Fetch the ABI/interface spec of a deployed Soroban contract. Returns decoded function signatures, parameter types, and emitted event schemas.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              contract_id: {
+                type: 'string',
+                description: 'The Soroban contract address (C...)',
+              },
+              network: {
+                type: 'string',
+                enum: ['mainnet', 'testnet', 'futurenet', 'custom'],
+                description: 'Override the active network for this call.',
+              },
+            },
+            required: ['contract_id'],
+          },
+        },
+        {
+          name: 'simulate_transaction',
+          description:
+            'Simulates a transaction on the Soroban RPC and returns results, footprint, fees, and events.',
           name: 'simulate_transaction',
           description:
             'Simulates a transaction on the Soroban RPC and returns results, footprint, fees, and events.',
@@ -1065,6 +1092,124 @@ class PulsarServer {
               },
             },
             required: [],
+          },
+        },
+        {
+          name: 'manage_subscription',
+          description:
+            'Compute the current state of a pull-payment recurring subscription between a subscriber and a merchant on the Stellar network. ' +
+            'Returns the subscription status (active / overdue / cancelled / expired / pending), a full billing schedule, amounts collected and outstanding, ' +
+            'and the next payment due date. Use the output to decide when to invoke submit_transaction to pull the next recurring fee. ' +
+            'No network call is made — all computation is deterministic from the supplied plan parameters.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              subscriber: {
+                type: 'string',
+                description: 'Stellar public key (G...) of the subscribing account.',
+              },
+              merchant: {
+                type: 'string',
+                description: 'Stellar public key (G...) of the merchant / service provider.',
+              },
+              amount_per_period: {
+                type: 'number',
+                description: 'Token amount charged per billing period (must be positive).',
+              },
+              asset_code: {
+                type: 'string',
+                description: 'Asset code, e.g. "USDC" or "XLM".',
+              },
+              asset_issuer: {
+                type: 'string',
+                description: 'Issuer public key (G...) for non-native assets. Omit for XLM.',
+              },
+              period_seconds: {
+                type: 'number',
+                description: 'Length of one billing period in seconds, e.g. 2592000 for monthly.',
+              },
+              start_timestamp: {
+                type: 'number',
+                description: 'Unix timestamp (seconds) when the subscription starts.',
+              },
+              total_periods: {
+                type: 'number',
+                description:
+                  'Maximum number of billing periods for fixed-term subscriptions. Omit for indefinite.',
+              },
+              cancelled_timestamp: {
+                type: 'number',
+                description: 'Unix timestamp when the subscriber cancelled. Omit if still active.',
+              },
+              payments_collected: {
+                type: 'number',
+                default: 0,
+                description: 'Number of periods already collected by the merchant (default: 0).',
+              },
+              grace_period_seconds: {
+                type: 'number',
+                default: 0,
+                description:
+                  'Extra seconds after a period due-date before the subscription is marked overdue (default: 0).',
+              },
+              current_timestamp: {
+                type: 'number',
+                description:
+                  'Optional override for current time as Unix timestamp; defaults to wall-clock.',
+              },
+            },
+            required: [
+              'subscriber',
+              'merchant',
+              'amount_per_period',
+              'asset_code',
+              'period_seconds',
+              'start_timestamp',
+            ],
+          },
+        },
+        {
+          name: 'analyze_contract_storage',
+          description:
+            "Analyses a deployed Soroban contract's on-chain ledger storage footprint. " +
+            'Fetches the contract instance entry (and optional additional ledger keys) from the ' +
+            'Soroban RPC, measures per-entry byte sizes and TTLs, and returns actionable ' +
+            'optimisation recommendations to reduce ledger-rent costs for large maps and datasets. ' +
+            'Common recommendations include: chunked/paginated map storage, TTL extension warnings, ' +
+            'and migration from instance to persistent storage for infrequently accessed data.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              contract_id: {
+                type: 'string',
+                description: 'The Soroban contract address (C…, 56 chars).',
+              },
+              network: {
+                type: 'string',
+                enum: ['mainnet', 'testnet', 'futurenet', 'custom'],
+                description: 'Override the configured network for this call.',
+              },
+              additional_keys: {
+                type: 'array',
+                items: { type: 'string' },
+                description:
+                  'Optional list of base64-encoded XDR ledger keys to include in the analysis ' +
+                  '(max 50). Use this to analyse specific persistent/temporary entries beyond ' +
+                  'the default instance entry.',
+              },
+              size_threshold_bytes: {
+                type: 'number',
+                default: 1024,
+                description:
+                  'Entries larger than this byte count are flagged as oversized (default: 1 024).',
+              },
+              include_recommendations: {
+                type: 'boolean',
+                default: true,
+                description: 'Whether to include optimisation recommendations (default: true).',
+              },
+            },
+            required: ['contract_id'],
           },
         },
       ],
@@ -1517,6 +1662,34 @@ class PulsarServer {
               throw new PulsarValidationError(`Invalid input for get_fee_stats`, parsed.error.format());
             }
             const result = await getFeeStats(parsed.data);
+            return {
+              content: [{ type: 'text', text: JSON.stringify(result) }],
+            };
+          }
+
+          case 'manage_subscription': {
+            const parsed = ManageSubscriptionInputSchema.safeParse(args);
+            if (!parsed.success) {
+              throw new PulsarValidationError(
+                `Invalid input for manage_subscription`,
+                parsed.error.format()
+              );
+            }
+            const result = await manageSubscription(parsed.data);
+            return {
+              content: [{ type: 'text', text: JSON.stringify(result) }],
+            };
+          }
+
+          case 'analyze_contract_storage': {
+            const parsed = AnalyzeContractStorageInputSchema.safeParse(args);
+            if (!parsed.success) {
+              throw new PulsarValidationError(
+                `Invalid input for analyze_contract_storage`,
+                parsed.error.format()
+              );
+            }
+            const result = await analyzeContractStorage(parsed.data);
             return {
               content: [{ type: 'text', text: JSON.stringify(result) }],
             };

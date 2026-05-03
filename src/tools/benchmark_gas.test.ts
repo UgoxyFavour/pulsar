@@ -1,5 +1,14 @@
 import { describe, it, expect, vi } from 'vitest';
 
+import { benchmarkGas } from './benchmark_gas';
+
+describe('benchmarkGas', () => {
+  it('should return cpu, memory, and pulsarGas fields', async () => {
+    const fakeSim = { gas: 123, result: 'ok' };
+    vi.mock('./simulate_transaction', () => ({
+      simulateTransaction: vi.fn().mockResolvedValue(fakeSim),
+    }));
+    const res = await benchmarkGas({
 import { benchmarkGas } from './benchmark_gas.js';
 
 describe('benchmarkGas', () => {

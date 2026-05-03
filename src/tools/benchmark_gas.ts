@@ -1,4 +1,8 @@
 import { performance } from 'perf_hooks';
+import { fileURLToPath } from 'url';
+
+import { simulateTransaction } from '../tools/simulate_transaction';
+import { logger } from '../logger';
 
 import { simulateTransaction } from '../tools/simulate_transaction.js';
 import logger from '../logger.js';
@@ -69,12 +73,20 @@ export async function benchmarkGas({
     simulationResult = await simulateTransaction({ xdr: mockXdr, network: 'testnet' });
   } catch (e) {
     error = e;
+    logger.error('Simulation failed', e);
     logger.error({ error: e }, 'Simulation failed');
   }
   const end = performance.now();
   const endMem = process.memoryUsage().rss;
   const cpuMs = end - start;
   const memDelta = endMem - startMem;
+  let pulsarGas = simulationResult?.gas ?? null;
+  logger.info('Benchmark complete', {
+    cpuMs,
+    memDelta,
+    pulsarGas,
+    error,
+  });
   let pulsarGas = simulationResult?.cost?.cpu_instructions ?? null;
   logger.info({ cpuMs, memDelta, pulsarGas, error }, 'Benchmark complete');
   let pulsarGas = simulationResult?.cost ?? null;
@@ -98,6 +110,7 @@ export async function benchmarkGas({
   };
 }
 
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 if (import.meta.url === `file://${process.argv[1]}`) {
   // CLI usage: node benchmark_gas.js <xdr> [network]
