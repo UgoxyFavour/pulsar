@@ -28,6 +28,7 @@ import { sorobanMath } from './tools/soroban_math.js';
 import { decodeLedgerEntryTool, decodeLedgerEntrySchema } from './tools/decode_ledger_entry.js';
 import { computeVestingSchedule } from './tools/compute_vesting_schedule.js';
 import { deployContract } from './tools/deploy_contract.js';
+import { calculateDutchAuctionPrice, calculateEnglishAuctionState } from './tools/auction_compute.js';
 import { manageDaoTreasury } from './tools/manage_dao_treasury.js';
 import { computeInterestRates, calculateBorrowingCapacity } from './tools/lending_compute.js';
 import { trackLedgerConsensusTime } from './tools/track_ledger_consensus_time.js';
@@ -62,6 +63,9 @@ import {
   SorobanMathInputSchema,
   ComputeVestingScheduleInputSchema,
   DeployContractInputSchema,
+  CalculateDutchAuctionPriceInputSchema,
+  CalculateEnglishAuctionStateInputSchema,
+} from './schemas/tools.js';
   ManageDaoTreasuryInputSchema,
   ComputeInterestRatesInputSchema,
   CalculateBorrowingCapacityInputSchema,
@@ -706,6 +710,37 @@ class PulsarServer {
     },
   },
   {
+    name: 'calculate_dutch_auction_price',
+    description: 'Calculate the current price of an asset in a Dutch auction (linear price decay). Useful for NFT drops or fair price discovery.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        start_price: { type: 'number', description: 'Initial auction price.' },
+        reserve_price: { type: 'number', description: 'Minimum/floor price.' },
+        start_timestamp: { type: 'number', description: 'Unix timestamp when decay begins.' },
+        end_timestamp: { type: 'number', description: 'Unix timestamp when price reaches reserve.' },
+        current_timestamp: { type: 'number', description: 'Optional override for current time.' },
+      },
+      required: ['start_price', 'reserve_price', 'start_timestamp', 'end_timestamp'],
+    },
+  },
+  {
+    name: 'calculate_english_auction_state',
+    description: 'Calculate the next bid requirements and state for an English auction.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        current_highest_bid: { type: 'number', description: 'Current top bid (0 if no bids).' },
+        reserve_price: { type: 'number', description: 'Minimum bid to win/start.' },
+        bid_increment: { type: 'number', description: 'Required increase over the current bid.' },
+        bid_increment_type: { type: 'string', enum: ['absolute', 'percentage'], default: 'absolute' },
+        end_timestamp: { type: 'number', description: 'Unix timestamp when auction ends.' },
+        current_timestamp: { type: 'number', description: 'Optional override for current time.' },
+      },
+      required: ['current_highest_bid', 'reserve_price', 'bid_increment', 'end_timestamp'],
+    },
+  },
+],
     name: 'compute_interest_rates',
     description: 'Calculate borrow and supply interest rates using a Jump Rate Model (standard for protocols like Aave). Useful for simulating lending pool dynamics.',
     inputSchema: {
@@ -1496,6 +1531,9 @@ class PulsarServer {
           case 'get_account_balance': {
             const parsed = GetAccountBalanceInputSchema.safeParse(args);
             if (!parsed.success) {
+              throw new PulsarValidationError(`Invalid input for get_account_balance`, parsed.error.format());
+            }
+            const result = await getAccountBalance(parsed.data);
               throw new PulsarValidationError(
                 `Invalid input for get_account_balance`,
                 parsed.error.format()
@@ -2053,6 +2091,21 @@ class PulsarServer {
             };
           }
 
+          case 'calculate_dutch_auction_price': {
+            const parsed = CalculateDutchAuctionPriceInputSchema.safeParse(args);
+            if (!parsed.success) {
+              throw new PulsarValidationError(`Invalid input for calculate_dutch_auction_price`, parsed.error.format());
+            }
+            const result = await calculateDutchAuctionPrice(parsed.data);
+            return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+          }
+
+          case 'calculate_english_auction_state': {
+            const parsed = CalculateEnglishAuctionStateInputSchema.safeParse(args);
+            if (!parsed.success) {
+              throw new PulsarValidationError(`Invalid input for calculate_english_auction_state`, parsed.error.format());
+            }
+            const result = await calculateEnglishAuctionState(parsed.data);
           case 'compute_interest_rates': {
             const parsed = ComputeInterestRatesInputSchema.safeParse(args);
             if (!parsed.success) {

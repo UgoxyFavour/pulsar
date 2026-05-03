@@ -222,6 +222,52 @@ export const EmergencyPauseInputSchema = z.object({
 export type EmergencyPauseInput = z.infer<typeof EmergencyPauseInputSchema>;
 
 /**
+ * Schema for calculate_dutch_auction_price tool
+ *
+ * Inputs:
+ * - start_price: Initial price of the asset
+ * - reserve_price: Minimum price (bottom of the curve)
+ * - start_timestamp: Unix timestamp when price begins to decay
+ * - end_timestamp: Unix timestamp when price reaches reserve
+ * - current_timestamp: Optional override for current time
+ */
+export const CalculateDutchAuctionPriceInputSchema = z.object({
+  start_price: z.number().positive(),
+  reserve_price: z.number().positive(),
+  start_timestamp: z.number().int().positive(),
+  end_timestamp: z.number().int().positive(),
+  current_timestamp: z.number().int().positive().optional(),
+});
+
+export type CalculateDutchAuctionPriceInput = z.infer<
+  typeof CalculateDutchAuctionPriceInputSchema
+>;
+
+/**
+ * Schema for calculate_english_auction_state tool
+ *
+ * Inputs:
+ * - current_highest_bid: The current bid to beat (0 if none)
+ * - reserve_price: Minimum bid required to start or win
+ * - bid_increment: Minimum amount or percentage to add to the highest bid
+ * - bid_increment_type: 'absolute' | 'percentage'
+ * - end_timestamp: Unix timestamp when the auction ends
+ * - current_timestamp: Optional override for current time
+ */
+export const CalculateEnglishAuctionStateInputSchema = z.object({
+  current_highest_bid: z.number().nonnegative(),
+  reserve_price: z.number().positive(),
+  bid_increment: z.number().positive(),
+  bid_increment_type: z.enum(["absolute", "percentage"]).default("absolute"),
+  end_timestamp: z.number().int().positive(),
+  current_timestamp: z.number().int().positive().optional(),
+});
+
+export type CalculateEnglishAuctionStateInput = z.infer<
+  typeof CalculateEnglishAuctionStateInputSchema
+>;
+
+/**
  * Schema for generate_contract_docs tool
  *
  * Inputs:
