@@ -22,6 +22,7 @@ import { sorobanMath } from './tools/soroban_math.js';
 import { decodeLedgerEntryTool, decodeLedgerEntrySchema } from './tools/decode_ledger_entry.js';
 import { computeVestingSchedule } from './tools/compute_vesting_schedule.js';
 import { deployContract } from './tools/deploy_contract.js';
+import { exportData } from './tools/export_data.js';
 import { checkNetworkStatusTool } from './tools/check_network_status.js';
 import { buildTransaction } from './tools/build_transaction.js';
 import { getClaimableBalance } from './tools/get_claimable_balance.js';
@@ -41,6 +42,7 @@ import {
   SorobanMathInputSchema,
   ComputeVestingScheduleInputSchema,
   DeployContractInputSchema,
+  ExportDataInputSchema,
   CheckNetworkStatusInputSchema,
   BuildTransactionInputSchema,
   GetClaimableBalanceInputSchema,
@@ -204,6 +206,8 @@ class PulsarServer {
         },
         {
           name: 'fetch_contract_spec',
+          description:
+            'Fetch the ABI/interface spec of a deployed Soroban contract. Returns decoded function signatures, parameter types, and emitted event schemas.',
           description: 'Fetch the ABI/interface spec of a deployed Soroban contract. Returns decoded function signatures, parameter types, and emitted event schemas.',
           inputSchema: {
             type: 'object',
@@ -825,6 +829,35 @@ class PulsarServer {
             required: [],
           },
         },
+        {
+          name: 'export_data',
+          description:
+            'Export data to CSV or JSON format files. Useful for saving tool results like account balances, transaction history, or contract data for analysis or reporting.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              data: {
+                type: ['array', 'object'],
+                description: 'Data to export - can be an array of objects or a single object',
+              },
+              format: {
+                type: 'string',
+                enum: ['csv', 'json'],
+                description: 'Export format: csv or json',
+              },
+              filename: {
+                type: 'string',
+                description: 'Optional filename (without extension). Default: export_{timestamp}',
+              },
+              include_timestamp: {
+                type: 'boolean',
+                default: true,
+                description: 'Whether to include export timestamp in the output',
+              },
+            },
+            required: ['data', 'format'],
+          },
+        },
       ],
     }));
 
@@ -1029,6 +1062,15 @@ class PulsarServer {
             };
           }
 
+          case 'export_data': {
+            const parsed = ExportDataInputSchema.safeParse(args);
+            if (!parsed.success) {
+              throw new PulsarValidationError(
+                `Invalid input for export_data`,
+                parsed.error.format()
+              );
+            }
+            const result = await exportData(parsed.data);
           case 'check_network_status': {
             const parsed = CheckNetworkStatusInputSchema.safeParse(args);
             if (!parsed.success) {

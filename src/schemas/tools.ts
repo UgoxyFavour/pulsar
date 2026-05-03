@@ -282,6 +282,31 @@ export const DeployContractInputSchema = z.object({
 export type DeployContractInput = z.infer<typeof DeployContractInputSchema>;
 
 /**
+ * Schema for export_data tool
+ *
+ * Allows exporting tool results to CSV or JSON format files
+ * Inputs:
+ * - data: The data to export (array of objects or single object)
+ * - format: 'csv' or 'json'
+ * - filename: Optional filename (default: export_{timestamp})
+ * - include_timestamp: Whether to include export timestamp (default: true)
+ */
+export const ExportDataInputSchema = z.object({
+  data: z
+    .union([z.array(z.record(z.unknown())), z.record(z.unknown())])
+    .describe('Data to export - can be an array of objects or a single object'),
+  format: z.enum(['csv', 'json']).describe('Export format: csv or json'),
+  filename: z
+    .string()
+    .optional()
+    .describe('Optional filename (without extension). Default: export_{timestamp}'),
+  include_timestamp: z
+    .boolean()
+    .default(true)
+    .describe('Whether to include export timestamp in the output'),
+});
+
+export type ExportDataInput = z.infer<typeof ExportDataInputSchema>;
  * Schema for check_network_status tool
  *
  * Inputs:

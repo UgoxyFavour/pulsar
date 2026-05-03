@@ -8,11 +8,15 @@ export enum PulsarErrorCode {
   RESTRICTED_ADDRESS = 'RESTRICTED_ADDRESS',
 }
 
+export interface ErrorDetails {
+  [key: string]: unknown;
+}
+
 export class PulsarError extends Error {
   constructor(
     public readonly code: PulsarErrorCode,
     message: string,
-    public readonly details?: any
+    public readonly details?: ErrorDetails
   ) {
     super(message);
     this.name = 'PulsarError';
@@ -21,28 +25,28 @@ export class PulsarError extends Error {
 }
 
 export class PulsarValidationError extends PulsarError {
-  constructor(message: string, details?: any) {
+  constructor(message: string, details?: ErrorDetails) {
     super(PulsarErrorCode.VALIDATION_ERROR, message, details);
     this.name = 'PulsarValidationError';
   }
 }
 
 export class PulsarNetworkError extends PulsarError {
-  constructor(message: string, details?: any) {
+  constructor(message: string, details?: ErrorDetails) {
     super(PulsarErrorCode.NETWORK_ERROR, message, details);
     this.name = 'PulsarNetworkError';
   }
 }
 
 export class PulsarCliError extends PulsarError {
-  constructor(message: string, details?: any) {
+  constructor(message: string, details?: ErrorDetails) {
     super(PulsarErrorCode.CLI_ERROR, message, details);
     this.name = 'PulsarCliError';
   }
 }
 
 export class PulsarNotFoundError extends PulsarError {
-  constructor(message: string, details?: any) {
+  constructor(message: string, details?: ErrorDetails) {
     super(PulsarErrorCode.NOT_FOUND_ERROR, message, details);
     this.name = 'PulsarNotFoundError';
   }
