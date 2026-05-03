@@ -1,3 +1,8 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { getHorizonServer } from '../../src/services/horizon.js';
+import { getAccountBalance } from '../../src/tools/get_account_balance.js';
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { getAccountBalance } from '../../src/tools/get_account_balance.js';
@@ -13,6 +18,9 @@ vi.mock('../../src/services/horizon.js', () => ({
 describe('getAccountBalance', () => {
   let mockServer: any;
 
+  const ACCOUNT_ID = 'GDH6TOWBDPXG7H5XQAWY2236P44XGHYYND43NHN7Q4XQAWY2236P44XG';
+  const ISSUER_ID = 'GBH6TOWBDPXG7H5XQAWY2236P44XGHYYND43NHN7Q4XQAWY2236P44XG';
+
   beforeEach(() => {
     vi.clearAllMocks();
     accountBalanceCache.clear();
@@ -22,6 +30,8 @@ describe('getAccountBalance', () => {
     vi.mocked(getHorizonServer).mockReturnValue(mockServer);
   });
 
+  it('returns balances for a funded account', async () => {
+    mockServer.loadAccount.mockResolvedValue({
   const ACCOUNT_ID = 'GDH6TOWBDPXG7H5XQAWY2236P44XGHYYND43NHN7Q4XQAWY2236P44XG';
 
   it('returns balances for a funded account', async () => {
@@ -41,9 +51,7 @@ describe('getAccountBalance', () => {
           balance: "50.00"
         },
       ],
-    };
-
-    mockServer.loadAccount.mockResolvedValue(mockAccount);
+    });
 
     const result = (await getAccountBalance({ account_id: ACCOUNT_ID })) as any;
 
@@ -52,6 +60,19 @@ describe('getAccountBalance', () => {
     expect(result.balances[0].asset_type).toBe('native');
     expect(result.balances[0].balance).toBe('100.0000000');
     expect(result.balances[1].asset_code).toBe('USDC');
+  });
+
+  it('rejects invalid input before loading Horizon data', async () => {
+    await expect(getAccountBalance({ account_id: 'INVALID_KEY' } as any)).rejects.toMatchObject({
+      name: 'PulsarValidationError',
+      message: 'Invalid input for get_account_balance',
+    });
+
+    expect(mockServer.loadAccount).not.toHaveBeenCalled();
+  });
+
+  it('filters by asset_code', async () => {
+    mockServer.loadAccount.mockResolvedValue({
   });
 
   it('filters by asset_code', async () => {
@@ -71,9 +92,7 @@ describe('getAccountBalance', () => {
           balance: '20.00',
         },
       ],
-    };
-
-    mockServer.loadAccount.mockResolvedValue(mockAccount);
+    });
 
     const result = (await getAccountBalance({
       account_id: ACCOUNT_ID,
@@ -84,6 +103,8 @@ describe('getAccountBalance', () => {
     expect(result.balances[0].asset_code).toBe('USDC');
   });
 
+  it('filters by asset_issuer', async () => {
+    mockServer.loadAccount.mockResolvedValue({
   const ISSUER_ID = 'GBH6TOWBDPXG7H5XQAWY2236P44XGHYYND43NHN7Q4XQAWY2236P44XG';
 
   it('filters by asset_issuer', async () => {
@@ -102,7 +123,7 @@ describe('getAccountBalance', () => {
           balance: '20.00',
         },
       ],
-    };
+    });
 
     mockServer.loadAccount.mockResolvedValue(mockAccount);
 
@@ -121,6 +142,19 @@ describe('getAccountBalance', () => {
     mockServer.loadAccount.mockRejectedValue(error);
 
     await expect(getAccountBalance({ account_id: ACCOUNT_ID })).rejects.toThrow(
+      'Account not found - it may not be funded yet'
+    );
+
+    try {
+      await getAccountBalance({ account_id: ACCOUNT_ID });
+    } catch (caughtError: any) {
+      expect(caughtError.name).toBe('PulsarNetworkError');
+      expect(caughtError.details.status).toBe(404);
+      expect(caughtError.details.account_id).toBe(ACCOUNT_ID);
+    }
+  });
+
+  it('throws other network errors with account diagnostics', async () => {
       'Account not found — it may not be funded yet'
     );
     await expect(getAccountBalance({ account_id: ACCOUNT_ID }))
@@ -141,6 +175,20 @@ describe('getAccountBalance', () => {
     mockServer.loadAccount.mockRejectedValue(error);
 
     await expect(getAccountBalance({ account_id: ACCOUNT_ID })).rejects.toThrow('Gateway Timeout');
+
+    try {
+      await getAccountBalance({ account_id: ACCOUNT_ID });
+    } catch (caughtError: any) {
+      expect(caughtError.details.account_id).toBe(ACCOUNT_ID);
+    }
+  });
+
+  it('falls back to a default error message when Horizon omits one', async () => {
+    mockServer.loadAccount.mockRejectedValue({});
+
+    await expect(getAccountBalance({ account_id: ACCOUNT_ID })).rejects.toThrow(
+      'Failed to load account balance'
+    );
   });
 
   it("normalizes account_id before lookup (trims whitespace, uppercases)", async () => {

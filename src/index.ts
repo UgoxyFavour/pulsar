@@ -9,6 +9,8 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { config } from './config.js';
+
+import { config } from './config.js';
 import { TOOL_REGISTRY } from './registry.js';
 import logger from './logger.js';
 import { PulsarError, PulsarNetworkError, PulsarValidationError } from './errors.js';
@@ -33,6 +35,7 @@ import { submitTransaction } from './tools/submit_transaction.js';
 import { simulateTransaction } from './tools/simulate_transaction.js';
 import { simulateTransactionsSequence } from './tools/simulate_transactions_sequence.js';
 import { getAccountBalance } from './tools/get_account_balance.js';
+import { getAccountBalances } from './tools/get_account_balances.js';
 import { manageRestrictedAddresses, ManageRestrictedAddressesInputSchema } from './tools/manage_restricted_addresses.js';
 import { emergencyPause } from './tools/emergency_pause.js';
 import { generateContractDocs } from './tools/generate_contract_docs.js';
@@ -76,6 +79,7 @@ import { batchEvents } from './tools/batch_events.js';
 import {
   FetchContractSpecInputSchema,
   GetAccountBalanceInputSchema,
+  GetAccountBalancesInputSchema,
   SubmitTransactionInputSchema,
   SimulateTransactionInputSchema,
   SimulateTransactionsSequenceInputSchema,
@@ -219,6 +223,51 @@ class PulsarServer {
           },
         },
         {
+          name: 'get_account_balances',
+          description:
+            'Fetch balances for multiple Stellar accounts in one tool call using concurrent Horizon requests. Returns per-account successes and errors with batch diagnostics.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              account_ids: {
+                type: 'array',
+                items: {
+                  type: 'string',
+                },
+                description:
+                  'A list of Stellar public keys (G...). Supports 1 to 25 unique accounts per call.',
+              },
+              asset_code: {
+                type: 'string',
+                description: 'Optional: Filter every account result by asset code (e.g. USDC)',
+              },
+              asset_issuer: {
+                type: 'string',
+                description: 'Optional: Filter every account result by asset issuer (G...)',
+              },
+              max_concurrency: {
+                type: 'number',
+                default: 5,
+                description:
+                  'Optional: Maximum number of concurrent Horizon requests to run at once (1-10).',
+              },
+              network: {
+                type: 'string',
+                enum: ['mainnet', 'testnet', 'futurenet', 'custom'],
+                description: 'Override the configured network for this call.',
+              },
+            },
+            required: ['account_ids'],
+          },
+        },
+        {
+          name: 'submit_transaction',
+          description:
+            '⚠️ IRREVERSIBLE. Always simulate first.\n\n' +
+            'Submits a signed transaction envelope (XDR) to the Stellar network via Horizon. ' +
+            'Optionally signs the transaction in-process using the configured STELLAR_SECRET_KEY ' +
+            '(the key is never logged or passed as a CLI argument). ' +
+            'Optionally waits up to 30 s for a SUCCESS or FAILED result from the Soroban RPC.',
           name: 'get_liquidity_pool',
           description: 'Query AMM liquidity pool reserves, total shares, fee (in basis points), and pool type from Horizon.',
           inputSchema: {
@@ -311,6 +360,8 @@ class PulsarServer {
         },
         {
           name: 'fetch_contract_spec',
+          description:
+            'Fetch the ABI/interface spec of a deployed Soroban contract. Returns decoded function signatures, parameter types, and emitted event schemas.',
           description:
             'Fetch the ABI/interface spec of a deployed Soroban contract. Returns decoded function signatures, parameter types, and emitted event schemas.',
           description:
@@ -1671,6 +1722,13 @@ class PulsarServer {
 
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
+
+      try {
+        logger.debug({ tool: name, arguments: args }, `Executing tool: ${name}`);
+
+        switch (name) {
+          case 'get_account_balance': {
+            const parsed = GetAccountBalanceInputSchema.safeParse(args);
       const tool = TOOL_REGISTRY.find((t) => t.name === name);
 
       if (!tool) {
@@ -1788,6 +1846,25 @@ class PulsarServer {
             };
           }
 
+          case 'get_account_balances': {
+            const parsed = GetAccountBalancesInputSchema.safeParse(args);
+            if (!parsed.success) {
+              throw new PulsarValidationError(
+                `Invalid input for get_account_balances`,
+                parsed.error.format()
+              );
+            }
+            const result = await getAccountBalances(parsed.data);
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(result),
+                },
+              ],
+            };
+          }
+
           case 'fetch_contract_spec': {
             const parsed = fetchContractSpecSchema.safeParse(args);
             if (!parsed.success) {
@@ -1795,6 +1872,8 @@ class PulsarServer {
                 `Invalid input for fetch_contract_spec`,
                 parsed.error.format()
               );
+            }
+            const result = await fetchContractSpec(parsed.data);
             }
             const result = await fetchContractSpec(parsed.data);
             }

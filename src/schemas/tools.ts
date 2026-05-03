@@ -40,6 +40,57 @@ export const GetAccountBalanceInputSchema = z.object({
 
 export type GetAccountBalanceInput = z.infer<typeof GetAccountBalanceInputSchema>;
 
+export const MAX_BATCH_ACCOUNT_IDS = 25;
+export const DEFAULT_ACCOUNT_BATCH_CONCURRENCY = 5;
+export const MAX_ACCOUNT_BATCH_CONCURRENCY = 10;
+
+/**
+ * Schema for get_account_balances tool
+ *
+ * Inputs:
+ * - account_ids: Stellar public keys (required, 1-25 entries)
+ * - network: Optional network override
+ * - asset_code: Optional asset code filter applied to every account
+ * - asset_issuer: Optional issuer filter applied to every account
+ * - max_concurrency: Optional batch concurrency limit (1-10, default: 5)
+ */
+export const GetAccountBalancesInputSchema = z.object({
+  account_ids: z
+    .array(StellarPublicKeySchema)
+    .min(1, { message: 'account_ids must contain at least one account' })
+    .max(MAX_BATCH_ACCOUNT_IDS, {
+      message: `account_ids must contain at most ${MAX_BATCH_ACCOUNT_IDS} accounts`,
+    })
+    .superRefine((accountIds, ctx) => {
+      const seen = new Set<string>();
+
+      accountIds.forEach((accountId, index) => {
+        if (seen.has(accountId)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Duplicate account_id at index ${index}: ${accountId}`,
+            path: [index],
+          });
+        }
+
+        seen.add(accountId);
+      });
+    }),
+  network: NetworkSchema.optional(),
+  asset_code: z.string().optional(),
+  asset_issuer: StellarPublicKeySchema.optional(),
+  max_concurrency: z
+    .number()
+    .int()
+    .min(1, { message: 'max_concurrency must be at least 1' })
+    .max(MAX_ACCOUNT_BATCH_CONCURRENCY, {
+      message: `max_concurrency must not exceed ${MAX_ACCOUNT_BATCH_CONCURRENCY}`,
+    })
+    .default(DEFAULT_ACCOUNT_BATCH_CONCURRENCY),
+});
+
+export type GetAccountBalancesInput = z.infer<typeof GetAccountBalancesInputSchema>;
+
 /**
  * Schema for submit_transaction tool
  *

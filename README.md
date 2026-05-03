@@ -32,6 +32,7 @@
   - [Any MCP-Compatible Client](#any-mcp-compatible-client)
 - [Tools Reference](#tools-reference)
   - [get_account_balance](#get_account_balance)
+  - [get_account_balances](#get_account_balances)
   - [search_assets](#search_assets)
   - [fetch_contract_spec](#fetch_contract_spec)
   - [simulate_transaction](#simulate_transaction)
@@ -99,6 +100,19 @@ There is currently **no community-driven MCP server** for Stellar, which means:
 
 ## Features
 
+| Capability                       | Details                                                                                               |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| **Account Balances**             | Query XLM and issued asset balances for one account or batch-fetch up to 25 accounts in a single call |
+| **Contract Spec Fetching**       | Retrieve the full ABI/interface spec of any deployed Soroban contract                                 |
+| **Transaction Simulation**       | Dry-run a Soroban transaction and inspect resource usage and return values before spending fees       |
+| **Ledger Entry Decoding**        | Decode raw XDR ledger entries into human-readable JSON                                                |
+| **Transaction Submission**       | Sign (via a provided secret key or external signer) and submit transactions to the network            |
+| **Contract Deployment**          | Deploy Soroban smart contracts via built-in deployer or factory contracts                             |
+| **Vesting Schedule Computation** | Calculate token vesting / timelock release schedules for team, investors, and advisors                |
+| **Multi-network**                | Targets Mainnet, Testnet, Futurenet, or a custom RPC endpoint                                         |
+| **Soroban CLI Backend**          | Delegates complex operations to the official `stellar` / `soroban` CLI for maximum correctness        |
+| **Structured Output**            | All tool responses are typed JSON objects the AI can directly parse and act upon                      |
+| **Zero-dependency transport**    | Uses standard MCP stdio transport — no extra HTTP server required                                     |
 | Capability                       | Details                                                                                         |
 | -------------------------------- | ----------------------------------------------------------------------------------------------- |
 | **Account Balances**             | Query XLM and any issued asset balance for any account on Mainnet or Testnet                    |
@@ -574,7 +588,7 @@ Retrieve the XLM balance and all issued asset balances held by a Stellar account
       "asset_code": "XLM",
       "balance": "9842.1234567",
       "buying_liabilities": "0.0000000",
-      "selling_liabilities": "0.0000000"
+      "selling_liabilities": "0.0000000",
     },
     {
       "asset_type": "credit_alphanum4",
@@ -582,10 +596,10 @@ Retrieve the XLM balance and all issued asset balances held by a Stellar account
       "asset_issuer": "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
       "balance": "250.0000000",
       "limit": "922337203685.4775807",
-      "is_authorized": true
-    }
+      "is_authorized": true,
+    },
   ],
-  "network": "testnet"
+  "network": "testnet",
 }
 ```
 
@@ -595,6 +609,62 @@ Retrieve the XLM balance and all issued asset balances held by a Stellar account
 
 ---
 
+### `get_account_balances`
+
+Fetch balances for multiple Stellar accounts in a single tool call. The server fans out concurrent Horizon requests with a bounded concurrency limit and returns per-account successes or failures without dropping the whole batch.
+
+**Input:**
+
+| Parameter         | Type       | Required | Description                                                                     |
+| ----------------- | ---------- | -------- | ------------------------------------------------------------------------------- |
+| `account_ids`     | `string[]` | Yes      | One to 25 unique Stellar public keys (`G...`)                                   |
+| `asset_code`      | `string`   | No       | Filter every account result to a specific asset code, e.g. `USDC`               |
+| `asset_issuer`    | `string`   | No       | The issuer public key for the filtered asset                                    |
+| `max_concurrency` | `number`   | No       | Maximum number of concurrent Horizon requests. Range: `1` to `10`. Default: `5` |
+| `network`         | `string`   | No       | Override the network for this call                                              |
+
+**Output:**
+
+```jsonc
+{
+  "network": "testnet",
+  "requested": 3,
+  "succeeded": 2,
+  "failed": 1,
+  "max_concurrency": 3,
+  "duration_ms": 184,
+  "results": [
+    {
+      "status": "success",
+      "account_id": "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
+      "balances": [
+        {
+          "asset_type": "native",
+          "balance": "9842.1234567",
+        },
+      ],
+    },
+    {
+      "status": "error",
+      "account_id": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHG",
+      "error_code": "NETWORK_ERROR",
+      "message": "Account not found - it may not be funded yet",
+      "details": {
+        "status": 404,
+        "account_id": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHG",
+      },
+    },
+  ],
+}
+```
+
+**Example prompt:**
+
+> _"Fetch XLM balances for these treasury accounts in one call and flag any unfunded ones: `GBBD47...`, `GBZX12...`, `GAAA...`."_
+
+---
+
+### `fetch_contract_spec`
 ### `get_fee_stats`
 
 Retrieve recent network fee statistics from Horizon to help estimate optimal transaction fees. Returns minimum, maximum, average, and percentile (p10–p99) fee values in stroops, along with a recommended fee based on the median (p50).
@@ -726,24 +796,25 @@ Fetch the ABI interface specification of a deployed Soroban smart contract. Retu
       "inputs": [
         { "name": "from", "type": "Address" },
         { "name": "to", "type": "Address" },
+        { "name": "amount", "type": "i128" },
         { "name": "amount", "type": "i128" }
       ],
-      "outputs": [{ "type": "bool" }]
+      "outputs": [{ "type": "bool" }],
     },
     {
       "name": "balance",
       "inputs": [{ "name": "id", "type": "Address" }],
-      "outputs": [{ "type": "i128" }]
-    }
+      "outputs": [{ "type": "i128" }],
+    },
   ],
   "events": [
     {
       "name": "transfer",
       "topics": [{ "type": "Symbol" }, { "type": "Address" }, { "type": "Address" }],
-      "data": { "type": "i128" }
-    }
+      "data": { "type": "i128" },
+    },
   ],
-  "raw_xdr": "AAAAAgAAAA..."
+  "raw_xdr": "AAAAAgAAAA...",
 }
 ```
 
@@ -771,19 +842,19 @@ Dry-run a Soroban transaction against the network without broadcasting it. Retur
   "status": "success",
   "return_value": {
     "type": "i128",
-    "value": "1000000000"
+    "value": "1000000000",
   },
   "cost": {
     "cpu_instructions": 512340,
-    "memory_bytes": 98304
+    "memory_bytes": 98304,
   },
   "footprint": {
     "read_only": ["ledger_key_1_xdr", "ledger_key_2_xdr"],
-    "read_write": ["ledger_key_3_xdr"]
+    "read_write": ["ledger_key_3_xdr"],
   },
   "min_resource_fee": "12345",
   "events": [],
-  "error": null
+  "error": null,
 }
 ```
 
@@ -873,19 +944,22 @@ Decode a raw base64-encoded XDR ledger entry into a human-readable JSON structur
     "contract": "CA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAXE",
     "key": {
       "type": "Symbol",
-      "value": "Balance"
+      "value": "Balance",
     },
     "val": {
       "type": "Map",
       "value": [
         {
           "key": { "type": "Address", "value": "GBBD47IF..." },
+          "val": { "type": "i128", "value": "5000000000" },
+        },
+      ],
           "val": { "type": "i128", "value": "5000000000" }
         }
       ]
     },
     "durability": "persistent",
-    "last_modified_ledger": 48123456
+    "last_modified_ledger": 48123456,
   },
   "raw_xdr": "AAAABgAAAAEA...",
   "compression": {
@@ -937,9 +1011,9 @@ Sign (optionally) and submit a transaction to the Stellar network. If `STELLAR_S
   "fee_charged": "1234",
   "return_value": {
     "type": "bool",
-    "value": true
+    "value": true,
   },
-  "result_xdr": "AAAAAAAAAGQ..."
+  "result_xdr": "AAAAAAAAAGQ...",
 }
 ```
 
@@ -953,9 +1027,9 @@ Sign (optionally) and submit a transaction to the Stellar network. If `STELLAR_S
   "diagnostic_events": [
     {
       "event": "contract error",
-      "message": "HostError: Error(Contract, #1)"
-    }
-  ]
+      "message": "HostError: Error(Contract, #1)",
+    },
+  ],
 }
 ```
 
@@ -1141,14 +1215,14 @@ Calculate a token vesting / timelock release schedule for team members, investor
     {
       "release_date": "2025-12-13T12:00:00.000Z",
       "amount": "20833.3333333",
-      "released": true
+      "released": true,
     },
     {
       "release_date": "2026-01-13T12:00:00.000Z",
       "amount": "20833.3333333",
-      "released": false
-    }
-  ]
+      "released": false,
+    },
+  ],
 }
 ```
 
@@ -1199,7 +1273,7 @@ Builds a Stellar transaction for deploying a Soroban smart contract. Supports tw
   "transaction_xdr": "AAAAAgAAAAE...",
   "predicted_contract_id": "CA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAXE",
   "network": "testnet",
-  "source_account": "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
+  "source_account": "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
 }
 ```
 
@@ -1215,7 +1289,7 @@ Builds a Stellar transaction for deploying a Soroban smart contract. Supports tw
     "memory_bytes": "678"
   },
   "network": "testnet",
-  "source_account": "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5"
+  "source_account": "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
 }
 ```
 

@@ -19,6 +19,7 @@ import {
   FetchContractSpecInputSchema,
   FetchContractSpecOutputSchema,
   GetAccountBalanceInputSchema,
+  GetAccountBalancesInputSchema,
   GetAccountBalanceOutputSchema,
   SimulateTransactionOutputSchema,
   SubmitTransactionInputSchema,
@@ -100,6 +101,106 @@ describe('GetAccountBalanceInputSchema', () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.network).toBeUndefined();
+    }
+  });
+});
+
+// ============================================================================
+// GetAccountBalancesInputSchema
+// ============================================================================
+
+describe('GetAccountBalancesInputSchema', () => {
+  const accountIds = [
+    'GABCDEFGHJKMNPQRSTUVWXYZ234567ABCDEFGHJKMNPQRSTUVWXYZ234',
+    'GBTZKYQRSVWXYZABTZKYQRSVWXYZABTZKYQRSVWXYZABTZKYQRSVWXYZ',
+  ];
+
+  it('accepts valid account_ids with defaults', () => {
+    const result = GetAccountBalancesInputSchema.safeParse({
+      account_ids: accountIds,
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.max_concurrency).toBe(5);
+    }
+  });
+
+  it('accepts an explicit network, filters, and concurrency', () => {
+    const result = GetAccountBalancesInputSchema.safeParse({
+      account_ids: accountIds,
+      network: 'testnet',
+      asset_code: 'USDC',
+      asset_issuer: 'GDZSTFXVCDTUJ76ZAV2HA72KYQMQPQH3S7WVMSZOHMQG4G4MWCZJ6FG7',
+      max_concurrency: 3,
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.network).toBe('testnet');
+      expect(result.data.asset_code).toBe('USDC');
+      expect(result.data.max_concurrency).toBe(3);
+    }
+  });
+
+  it('rejects an empty account_ids array', () => {
+    const result = GetAccountBalancesInputSchema.safeParse({
+      account_ids: [],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects duplicate account_ids', () => {
+    const result = GetAccountBalancesInputSchema.safeParse({
+      account_ids: [accountIds[0], accountIds[0]],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toContain('Duplicate');
+    }
+  });
+
+  it('rejects invalid account_ids', () => {
+    const result = GetAccountBalancesInputSchema.safeParse({
+      account_ids: ['INVALID_KEY'],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects more than 25 account_ids', () => {
+    const result = GetAccountBalancesInputSchema.safeParse({
+      account_ids: Array.from({ length: 26 }, (_, index) =>
+        `G${String(index).padStart(55, 'A')}`.slice(0, 56)
+      ),
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects max_concurrency below the lower bound', () => {
+    const result = GetAccountBalancesInputSchema.safeParse({
+      account_ids: accountIds,
+      max_concurrency: 0,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toContain('at least 1');
+    }
+  });
+
+  it('rejects max_concurrency above the upper bound', () => {
+    const result = GetAccountBalancesInputSchema.safeParse({
+      account_ids: accountIds,
+      max_concurrency: 11,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toContain('must not exceed');
     }
   });
 });
