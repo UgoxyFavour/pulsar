@@ -390,6 +390,26 @@ export const DeployContractInputSchema = z.object({
 export type DeployContractInput = z.infer<typeof DeployContractInputSchema>;
 
 /**
+ * Schema for get_price_feed tool
+ *
+ * Queries a decentralized oracle contract for the price of a base asset in terms of a quote asset.
+ * Assumes the oracle contract implements a standard interface with a 'get_price' function
+ * that takes two symbol arguments (base_asset, quote_asset) and returns an i128 price.
+ *
+ * Inputs:
+ * - contract_id: The oracle contract ID (required)
+ * - base_asset: The base asset symbol (e.g., 'USD')
+ * - quote_asset: The quote asset symbol (e.g., 'XLM')
+ * - network: Optional network override
+ */
+export const GetPriceFeedInputSchema = z.object({
+  contract_id: ContractIdSchema,
+  base_asset: z.string().min(1).describe("Base asset symbol (e.g., 'USD')"),
+  quote_asset: z.string().min(1).describe("Quote asset symbol (e.g., 'XLM')"),
+  network: NetworkSchema.optional(),
+});
+
+export type GetPriceFeedInput = z.infer<typeof GetPriceFeedInputSchema>;
  * Schema for safe_math_compute tool
  *
  * Inputs:

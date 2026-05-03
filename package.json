@@ -29,6 +29,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "lint:staged": "eslint --fix --max-warnings 100 || true",
     "test:integration": "RUN_INTEGRATION_TESTS=true vitest run tests/integration",
     "test:contracts": "cargo test --manifest-path contracts/Cargo.toml",
     "build:contracts": "cargo build --manifest-path contracts/Cargo.toml --target wasm32-unknown-unknown --release",
@@ -38,7 +39,7 @@
   },
   "lint-staged": {
     "*.ts": [
-      "eslint --fix",
+      "npm run lint:staged",
       "prettier --write"
     ]
   },

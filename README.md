@@ -42,6 +42,7 @@
   - [soroban_math](#soroban_math)
   - [compute_vesting_schedule](#compute_vesting_schedule)
   - [deploy_contract](#deploy_contract)
+  - [get_price_feed](#get_price_feed)
   - [calculate_dutch_auction_price](#calculate_dutch_auction_price)
   - [calculate_english_auction_state](#calculate_english_auction_state)
   - [safe_math_compute](#safe_math_compute)
@@ -125,6 +126,7 @@ There is currently **no community-driven MCP server** for Stellar, which means:
 | **Transaction Build Helper** | Construct common Stellar transactions (payment, trustline, manage data, etc.) without raw XDR knowledge |
 | **Soroban Math** | Fixed-point arithmetic, statistical functions (mean, std dev, TWAP), and financial math (compound interest, basis points) compatible with Soroban's 7-decimal integer model |
 | **Contract Deployment** | Deploy Soroban smart contracts via built-in deployer or factory contracts |
+| **Price Feed Queries** | Query decentralized oracle contracts for real-time asset prices |
 | **Protocol Version Info** | Track network upgrades and feature availability across different networks |
 | **Vesting Schedule Computation** | Calculate token vesting / timelock release schedules for team, investors, and advisors |
 | **Auction Pricing** | Calculate current prices and bid requirements for Dutch and English auctions |
@@ -1209,6 +1211,9 @@ Builds a Stellar transaction for deploying a Soroban smart contract. Supports tw
 
 ---
 
+### `get_price_feed`
+
+Queries a decentralized oracle contract for the price of a base asset in terms of a quote asset. Assumes the oracle contract implements a standard interface with a `get_price(base_asset: Symbol, quote_asset: Symbol) -> i128` function.
 ---
 
 ### `calculate_dutch_auction_price`
@@ -1257,6 +1262,10 @@ Retrieves the current Stellar protocol version and network information from Hori
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
+| `contract_id` | `string` | Yes | The Soroban oracle contract address (`C...`) |
+| `base_asset` | `string` | Yes | Base asset symbol (e.g., `USD`) |
+| `quote_asset` | `string` | Yes | Quote asset symbol (e.g., `XLM`) |
+| `network` | `string` | No | Override the network for this call (`mainnet`, `testnet`, `futurenet`) |
 | `current_highest_bid` | `number` | Yes | The current bid to beat (0 if none) |
 | `reserve_price` | `number` | Yes | Minimum bid required to start or win |
 | `bid_increment` | `number` | Yes | Minimum amount or percentage to add |
@@ -1616,6 +1625,11 @@ Query the current state of an AMM pool, including reserves for both assets and t
 
 ```jsonc
 {
+  "contract_id": "CA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAXE",
+  "base_asset": "USD",
+  "quote_asset": "XLM",
+  "price": "1000000",
+  "network": "testnet"
   "status": "success",
   "pool": {
     "asset_a": {
@@ -1637,6 +1651,7 @@ Query the current state of an AMM pool, including reserves for both assets and t
 
 **Example prompt:**
 
+> _"Get the current USD/XLM price from oracle contract `CA3D...` on testnet."_
 > _"Get pool information for the XLM/USDC pair on AMM contract `CA3D...`."_
 
 ---
@@ -1955,6 +1970,7 @@ The HTTP metrics server will not start, and no metrics will be collected.
 - [x] `soroban_math` — fixed-point, statistical, and financial math
 - [x] `compute_vesting_schedule` — token vesting / timelock schedule calculator
 - [x] `deploy_contract` — deploy Soroban contracts via built-in deployer or factory pattern
+- [x] `get_price_feed` — query decentralized oracle contracts for real-time asset prices
 - [x] Prometheus metrics export — monitor tool performance, errors, and resource usage
 - [x] `get_liquidity_pool` — fetch AMM pool reserves, shares, and fee settings
 - [x] `get_fee_stats` — retrieve network fee statistics and recommended fees

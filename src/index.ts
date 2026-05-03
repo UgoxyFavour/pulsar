@@ -28,6 +28,7 @@ import { sorobanMath } from './tools/soroban_math.js';
 import { decodeLedgerEntryTool, decodeLedgerEntrySchema } from './tools/decode_ledger_entry.js';
 import { computeVestingSchedule } from './tools/compute_vesting_schedule.js';
 import { deployContract } from './tools/deploy_contract.js';
+import { getPriceFeed } from './tools/get_price_feed.js';
 import {
   calculateDutchAuctionPrice,
   calculateEnglishAuctionState,
@@ -68,6 +69,7 @@ import {
   SorobanMathInputSchema,
   ComputeVestingScheduleInputSchema,
   DeployContractInputSchema,
+  GetPriceFeedInputSchema,
   CalculateDutchAuctionPriceInputSchema,
   CalculateEnglishAuctionStateInputSchema,
   SafeMathComputeInputSchema,
@@ -289,6 +291,8 @@ class PulsarServer {
         },
         {
           name: 'fetch_contract_spec',
+          description:
+            'Fetch the ABI/interface spec of a deployed Soroban contract. Returns decoded function signatures, parameter types, and emitted event schemas.',
           description:
             'Fetch the ABI/interface spec of a deployed Soroban contract. Returns decoded function signatures, parameter types, and emitted event schemas.',
           description:
@@ -718,6 +722,9 @@ class PulsarServer {
           },
         },
         {
+          name: 'get_price_feed',
+          description:
+            'Queries a decentralized oracle contract for the price of a base asset in terms of a quote asset. Assumes the oracle implements a standard interface with a get_price(base_asset: Symbol, quote_asset: Symbol) -> i128 function.',
           name: 'calculate_dutch_auction_price',
           description:
             'Calculate the current price of an asset in a Dutch auction (linear price decay). Useful for NFT drops or fair price discovery.',
@@ -1279,6 +1286,15 @@ class PulsarServer {
             properties: {
               contract_id: {
                 type: 'string',
+                description: 'The Soroban oracle contract address (C...).',
+              },
+              base_asset: {
+                type: 'string',
+                description: 'Base asset symbol (e.g., USD).',
+              },
+              quote_asset: {
+                type: 'string',
+                description: 'Quote asset symbol (e.g., XLM).',
                 description: 'The Soroban contract address (C...)',
               },
               network: {
@@ -1471,6 +1487,8 @@ class PulsarServer {
                 enum: ['mainnet', 'testnet', 'futurenet', 'custom'],
                 description: 'Override the configured network for this call.',
               },
+            },
+            required: ['contract_id', 'base_asset', 'quote_asset'],
               additional_keys: {
                 type: 'array',
                 items: { type: 'string' },
@@ -1638,6 +1656,10 @@ class PulsarServer {
             if (!parsed.success) {
               throw new PulsarValidationError(
                 `Invalid input for fetch_contract_spec`,
+                parsed.error.format()
+              );
+            }
+            const result = await fetchContractSpec(parsed.data);
               throw new PulsarValidationError(`Invalid input for get_account_balance`, parsed.error.format());
             }
             const result = await getAccountBalance(parsed.data);
@@ -2176,6 +2198,18 @@ class PulsarServer {
             };
           }
 
+          case 'get_price_feed': {
+            const parsed = GetPriceFeedInputSchema.safeParse(args);
+            if (!parsed.success) {
+              throw new PulsarValidationError(
+                `Invalid input for get_price_feed`,
+                parsed.error.format()
+              );
+            }
+            const result = await getPriceFeed(parsed.data);
+            return {
+              content: [{ type: 'text', text: JSON.stringify(result) }],
+            };
           case 'calculate_dutch_auction_price': {
             const parsed = CalculateDutchAuctionPriceInputSchema.safeParse(args);
             if (!parsed.success) {
