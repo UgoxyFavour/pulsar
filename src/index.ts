@@ -47,6 +47,7 @@ import { sorobanMath } from './tools/soroban_math.js';
 import { decodeLedgerEntryTool, decodeLedgerEntrySchema } from './tools/decode_ledger_entry.js';
 import { computeVestingSchedule } from './tools/compute_vesting_schedule.js';
 import { deployContract } from './tools/deploy_contract.js';
+import { getOrderbook } from './tools/get_orderbook.js';
 import { decodeLedgerEntryTool, decodeLedgerEntrySchema } from './tools/decode_ledger_entry.js';
 import { getPriceFeed } from './tools/get_price_feed.js';
 import {
@@ -90,6 +91,7 @@ import {
   SorobanMathInputSchema,
   ComputeVestingScheduleInputSchema,
   DeployContractInputSchema,
+  GetOrderbookInputSchema,
   GetPriceFeedInputSchema,
   CalculateDutchAuctionPriceInputSchema,
   CalculateEnglishAuctionStateInputSchema,
@@ -738,6 +740,40 @@ class PulsarServer {
           },
         },
         {
+          name: 'get_orderbook',
+          description:
+            'Retrieve and analyze the Stellar DEX orderbook for a trading pair. Returns raw bids/asks plus derived analytics including spread, mid price, liquidity depth, and orderbook imbalance. Useful for market making, arbitrage detection, and liquidity analysis.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              selling_asset_code: {
+                type: 'string',
+                description: 'Asset code being sold (e.g. XLM, USDC)',
+              },
+              selling_asset_issuer: {
+                type: 'string',
+                description: 'Issuer account for selling asset. Omit for XLM native.',
+              },
+              buying_asset_code: {
+                type: 'string',
+                description: 'Asset code being bought',
+              },
+              buying_asset_issuer: {
+                type: 'string',
+                description: 'Issuer account for buying asset. Omit for XLM native.',
+              },
+              limit: {
+                type: 'integer',
+                minimum: 1,
+                maximum: 200,
+                default: 20,
+                description: 'Number of price levels to return per side (1-200)',
+              },
+              depth_levels: {
+                type: 'array',
+                items: { type: 'number' },
+                description: 'Price percentage levels for depth analysis',
+                default: [1, 2, 5],
           name: 'soulbound_token',
           description:
             'Build an unsigned Soroban transaction XDR for Soulbound Token (SBT) operations on a deployed SBT contract. ' +
@@ -1628,6 +1664,7 @@ class PulsarServer {
                 description: 'Override the configured network for this call.',
               },
             },
+            required: ['selling_asset_code', 'buying_asset_code'],
             required: ['contract_id', 'base_asset', 'quote_asset'],
               additional_keys: {
                 type: 'array',
@@ -2485,6 +2522,17 @@ class PulsarServer {
                   text: JSON.stringify(applyFieldProjection(result, parsed.data.fields)),
                 },
               ],
+            };
+          }
+
+          case 'get_orderbook': {
+            const parsed = GetOrderbookInputSchema.safeParse(args);
+            if (!parsed.success) {
+              throw new PulsarValidationError(`Invalid input for get_orderbook`, parsed.error.format());
+            }
+            const result = await getOrderbook(parsed.data);
+            return {
+              content: [{ type: 'text', text: JSON.stringify(result) }],
             };
           }
 
